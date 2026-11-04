@@ -320,14 +320,39 @@
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function signTxt(v){ return (v>0?"+":"") + v; }
 
-    function fetchJSON(url){
-      return fetch(url, { method:"GET" }).then(function(r){
+    /* Data routes: direct OKX first; if the visitor's network cannot reach
+       okx.com (common on mainland-CN connections), fall back to public CORS
+       relays that fetch the same public market data. The first route that
+       answers becomes sticky for the rest of the session. Market data only —
+       no keys, no account data ever passes through any route. */
+    var ROUTES = [
+      function(u){ return u; },
+      function(u){ return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); },
+      function(u){ return "https://corsproxy.io/?url=" + encodeURIComponent(u); }
+    ];
+    var routeIdx = 0;
+    function fetchOnce(url, ms){
+      var ctl = ("AbortController" in window) ? new AbortController() : null;
+      var to = ctl ? setTimeout(function(){ ctl.abort(); }, ms) : null;
+      return fetch(url, { method:"GET", signal: ctl ? ctl.signal : undefined }).then(function(r){
+        if(to) clearTimeout(to);
         if(!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
-      }).then(function(j){
-        if(j.code !== "0") throw new Error("OKX 返回错误 " + j.code + " " + (j.msg||""));
-        return j.data;
       });
+    }
+    function fetchJSON(url){
+      var order = [];
+      for(var k=0;k<ROUTES.length;k++) order.push((routeIdx + k) % ROUTES.length);
+      function attempt(i){
+        if(i >= order.length) return Promise.reject(new Error("所有数据通道均失败"));
+        var ri = order[i];
+        return fetchOnce(ROUTES[ri](url), 9000).then(function(j){
+          if(!j || j.code !== "0") throw new Error("OKX 返回错误 " + (j && j.code) + " " + ((j && j.msg) || ""));
+          routeIdx = ri;
+          return j.data;
+        }).catch(function(e){ return attempt(i + 1); });
+      }
+      return attempt(0);
     }
 
     /* OKX candle row: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm] — API returns newest first */
