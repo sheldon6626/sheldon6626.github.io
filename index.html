@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:," />
+    <title>实盘量化交易工具 · BTCUSDT 永续信号</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root{
+        --bg:#0a0c0f; --panel:#12151a; --panel2:#171b21; --line:#232830; --line2:#2c333d;
+        --text:#e8eaed; --muted:#8a919c; --faint:#5c646f;
+        --green:#0ecb81; --green-dim:rgba(14,203,129,.13); --green-text:#2ee6a6;
+        --red:#f6465d; --red-dim:rgba(246,70,93,.13); --red-text:#ff7d8f;
+        --amber:#f0b90b; --amber-dim:rgba(240,185,11,.12);
+        --grey:#9aa3af;
+        --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        --sans:"Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;padding:0}
+      body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.55}
+      .wrap{max-width:1180px;margin:0 auto;padding:0 16px 40px}
+      .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+      .up{color:var(--green-text)} .down{color:var(--red-text)}
+
+      /* ---------- top bar ---------- */
+      .topbar{position:sticky;top:0;z-index:20;background:rgba(10,12,15,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+      .topbar-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+      .pair{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+      .pair b{font-size:19px;font-weight:900;letter-spacing:.2px}
+      .pair .tag{font-size:11px;font-weight:700;color:#0a0c0f;background:var(--amber);border-radius:3px;padding:1px 6px}
+      .pair .src{font-size:11px;color:var(--faint)}
+      .live-price{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.1}
+      .live-chg{font-family:var(--mono);font-size:13px;font-weight:600}
+      .topstats{display:flex;gap:20px;flex-wrap:wrap;margin-left:4px}
+      .tstat{display:flex;flex-direction:column}
+      .tstat span{font-size:10.5px;color:var(--faint)}
+      .tstat b{font-family:var(--mono);font-size:13px;font-weight:600}
+      .topright{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+      .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+      .dot.live{background:var(--green);box-shadow:0 0 0 3px var(--green-dim)}
+      .dot.err{background:var(--red)}
+      .btn{appearance:none;border:1px solid var(--line2);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:700;border-radius:6px;padding:7px 14px;cursor:pointer}
+      .btn:hover{border-color:var(--grey)}
+      .btn:active{transform:translateY(1px)}
+      .btn:disabled{opacity:.5;cursor:wait}
+
+      /* ---------- states ---------- */
+      .statebox{margin:28px 0;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:34px 20px;text-align:center;color:var(--muted)}
+      .statebox.err{border-color:rgba(246,70,93,.45);color:var(--red-text)}
+      .statebox .big{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+      .statebox.err .big{color:var(--red-text)}
+      .hidden{display:none !important}
+
+      /* ---------- verdict ---------- */
+      .verdict{margin-top:18px;border:1px solid var(--line);border-radius:10px;padding:22px 22px 18px;background:var(--panel);border-left:5px solid var(--grey)}
+      .verdict.long{border-left-color:var(--green);background:linear-gradient(180deg,var(--green-dim),var(--panel) 70%)}
+      .verdict.short{border-left-color:var(--red);background:linear-gradient(180deg,var(--red-dim),var(--panel) 70%)}
+      .verdict-row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+      .verdict-main{flex:1 1 300px;min-width:260px}
+      .verdict-kicker{font-size:12px;color:var(--muted);letter-spacing:.14em;font-weight:700}
+      .verdict-word{font-size:clamp(34px,6vw,52px);font-weight:900;line-height:1.15;margin:2px 0 4px}
+      .verdict.long .verdict-word{color:var(--green-text)}
+      .verdict.short .verdict-word{color:var(--red-text)}
+      .verdict.flat .verdict-word{color:var(--grey)}
+      .verdict-sub{color:var(--muted);font-size:13px;max-width:52ch}
+      .verdict-scorebox{text-align:right;flex:none}
+      .verdict-score{font-family:var(--mono);font-size:44px;font-weight:700;line-height:1}
+      .verdict-score small{font-size:14px;color:var(--faint);font-weight:400}
+      .verdict-scorelabel{font-size:11.5px;color:var(--faint);margin-top:4px}
+      .gauge{margin-top:18px}
+      .gauge-track{position:relative;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--red) 0%,#7a3040 30%,#3a4048 46%,#3a4048 54%,#2c6e57 70%,var(--green) 100%)}
+      .gauge-zero{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.55)}
+      .gauge-marker{position:absolute;top:50%;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid #0a0c0f;transform:translate(-50%,-50%);box-shadow:0 1px 6px rgba(0,0,0,.6);transition:left .5s ease}
+      .gauge-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:6px}
+      .gauge-zones{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);margin-top:2px}
+      .tfmix{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+      .tfmix .chip{border:1px solid var(--line2);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--muted);background:var(--panel2)}
+      .tfmix .chip b{font-family:var(--mono);font-weight:700}
+      .conflict-note{margin-top:12px;border:1px solid rgba(240,185,11,.4);background:var(--amber-dim);color:#ffd75e;border-radius:6px;padding:9px 12px;font-size:13px}
+
+      /* ---------- chart ---------- */
+      .chartcard{margin-top:16px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px 18px 10px}
+      .chart-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+      .chart-head h2{font-size:14px;margin:0;font-weight:700}
+      .chart-head .legend{font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+      .lg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+      .chart-svg{width:100%;height:auto;display:block}
+      .chart-svg text{font-family:var(--mono);font-size:10px;fill:var(--faint)}
+
+      /* ---------- timeframe cards ---------- */
+      .sec-title{margin:26px 0 4px;font-size:17px;font-weight:900}
+      .sec-sub{color:var(--muted);font-size:12.5px;margin:0 0 12px}
+      .tfgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+      @media (max-width:960px){.tfgrid{grid-template-columns:1fr}}
+      .tfcard{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px 16px 12px}
+      .tfcard-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .tfcard-head h3{margin:0;font-size:16px;font-weight:900}
+      .tfscore{margin-left:auto;text-align:right}
+      .tfscore .v{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1}
+      .tfscore .l{font-size:10.5px;color:var(--faint)}
+      .regime{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px}
+      .regime.trend{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(240,185,11,.35)}
+      .regime.trans{color:var(--grey);background:var(--panel2);border:1px solid var(--line2)}
+      .regime.range{color:#7cc4ff;background:rgba(124,196,255,.1);border:1px solid rgba(124,196,255,.3)}
+      .damp{font-size:11px;color:var(--faint)}
+      .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin:13px 0 4px}
+      .stat{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 9px}
+      .stat span{display:block;font-size:10.5px;color:var(--faint)}
+      .stat b{font-family:var(--mono);font-size:13.5px;font-weight:600}
+      .sr{margin-top:8px;font-size:12px;color:var(--muted)}
+      .sr b{font-family:var(--mono);font-weight:600}
+      .sr .bar{position:relative;height:6px;border-radius:3px;background:var(--line);margin:6px 0 2px}
+      .sr .bar i{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #0a0c0f;transform:translate(-50%,-50%)}
+      table.votes{width:100%;border-collapse:collapse;margin-top:12px}
+      table.votes th{font-size:10.5px;color:var(--faint);text-align:left;font-weight:500;padding:4px 4px;border-bottom:1px solid var(--line)}
+      table.votes th.r,table.votes td.r{text-align:right}
+      table.votes td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+      table.votes tr:last-child td{border-bottom:none}
+      .algo-name{font-weight:700;font-size:12.5px;white-space:nowrap}
+      .algo-name .w{color:var(--faint);font-weight:400;font-size:11px}
+      .algo-key{font-family:var(--mono);font-size:10.8px;color:var(--muted);line-height:1.45;word-break:break-all}
+      .votebar{position:relative;width:86px;height:8px;background:var(--line);border-radius:4px;margin-top:5px}
+      .votebar .zero{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--faint)}
+      .votebar .fill{position:absolute;top:0;bottom:0;border-radius:4px}
+      .votebar .fill.pos{background:var(--green);right:50%}
+      .votebar .fill.neg{background:var(--red);left:50%}
+      .vote-num{font-family:var(--mono);font-size:12px;font-weight:700;text-align:right;white-space:nowrap}
+
+      /* ---------- risk plan ---------- */
+      .risk{margin-top:26px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:18px 20px}
+      .risk h2{margin:0 0 2px;font-size:17px;font-weight:900}
+      .risk .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+      .risk-inputs{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+      .field{display:flex;flex-direction:column;gap:4px}
+      .field label{font-size:11.5px;color:var(--muted)}
+      .field .inwrap{display:flex;align-items:center;gap:6px}
+      .field input{width:130px;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:15px;padding:8px 10px;outline:none}
+      .field input:focus{border-color:var(--amber)}
+      .field .unit{color:var(--faint);font-size:12px}
+      .plan-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+      @media (max-width:860px){.plan-grid{grid-template-columns:1fr 1fr}}
+      .plan-cell{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:12px 14px}
+      .plan-cell span{display:block;font-size:11.5px;color:var(--muted)}
+      .plan-cell b{font-family:var(--mono);font-size:20px;font-weight:700}
+      .plan-cell small{display:block;color:var(--faint);font-size:11px;margin-top:2px}
+      .plan-cell.sl{border-color:rgba(246,70,93,.4)} .plan-cell.sl b{color:var(--red-text)}
+      .plan-cell.tp b{color:var(--green-text)}
+      .size-row{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--muted)}
+      .size-row b{font-family:var(--mono);color:var(--text);font-size:15px}
+      .caution{margin-top:14px;border:1px solid rgba(240,185,11,.45);background:var(--amber-dim);border-radius:8px;padding:11px 14px;font-size:13.5px;color:#ffe08a}
+      .caution b{color:#ffd75e}
+      .flat-note{border:1px dashed var(--line2);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13.5px}
+
+      /* ---------- footer ---------- */
+      .method{margin-top:26px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:18px 20px}
+      .method h2{margin:0 0 8px;font-size:15px;font-weight:900}
+      .method p,.method li{color:var(--muted);font-size:12.8px}
+      .method ul{margin:6px 0;padding-left:18px}
+      .disclaimer{margin-top:16px;border:1px solid rgba(246,70,93,.35);background:var(--red-dim);border-radius:8px;padding:13px 16px;font-size:13px;color:#f3b7bf}
+      .disclaimer b{color:var(--red-text)}
+      .foot{margin-top:14px;color:var(--faint);font-size:11.5px;text-align:center}
+      a{color:#7cc4ff}
+
+      /* ---------- access gate ---------- */
+      .gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px 18px}
+      .gate[hidden]{display:none}
+      .gate-box{width:100%;max-width:340px;text-align:center}
+      .gate-title{font-size:24px;font-weight:900;letter-spacing:.02em;margin:0 0 8px}
+      .gate-sub{color:var(--muted);font-size:14px;margin:0 0 26px}
+      .gate-input{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:.45em;text-align:center;padding:14px 10px 14px calc(10px + .45em);outline:none;-webkit-text-security:disc}
+      .gate-input:focus{border-color:var(--amber)}
+      .gate-input.err{border-color:var(--red);animation:gateShake .32s ease}
+      @keyframes gateShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+      .gate-err{min-height:20px;color:var(--red-text);font-size:13px;margin:12px 0 4px}
+      .gate-btn{width:100%;appearance:none;border:1px solid var(--line2);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:16px;font-weight:700;border-radius:10px;padding:14px;margin-top:14px;cursor:pointer}
+      .gate-btn:active{transform:translateY(1px)}
+      .gate-btn:disabled{opacity:.5;cursor:wait}
+    </style>
+  </head>
+  <body>
+    <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <form class="gate-box" id="gateForm" autocomplete="off">
+        <h1 class="gate-title" id="gateTitle">实盘量化交易工具</h1>
+        <p class="gate-sub">请输入访问密码</p>
+        <input class="gate-input" id="gatePin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="访问密码" />
+        <div class="gate-err" id="gateErr" role="alert"></div>
+        <button class="gate-btn" id="gateBtn" type="submit">进入</button>
+      </form>
+    </div>
+
+    <div class="topbar">
+      <div class="topbar-in">
+        <div class="pair"><b>BTCUSDT</b><span class="tag">永续</span><span class="src">OKX 实盘行情</span></div>
+        <div>
+          <div class="live-price num" id="livePrice">—</div>
+          <div class="live-chg num" id="liveChg">24h —</div>
+        </div>
+        <div class="topstats">
+          <div class="tstat"><span>24h 最高</span><b id="high24">—</b></div>
+          <div class="tstat"><span>24h 最低</span><b id="low24">—</b></div>
+          <div class="tstat"><span>资金费率 / 8h</span><b id="funding">—</b></div>
+          <div class="tstat"><span>24h 成交量 (BTC)</span><b id="vol24">—</b></div>
+        </div>
+        <div class="topright">
+          <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">正在连接…</span></div>
+          <button class="btn" id="refreshBtn" type="button">立即刷新</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div class="statebox" id="loadingBox">
+        <div class="big">正在拉取 OKX 实盘数据并计算 9 个算法…</div>
+        首次加载需要获取 15 分钟 / 1 小时 / 4 小时三个周期各 300 根 K 线，请稍候。
+      </div>
+      <div class="statebox err hidden" id="errorBox">
+        <div class="big">行情获取失败</div>
+        <div id="errorMsg">网络异常，未能连接 OKX 公开接口。</div>
+        <p style="margin:12px 0 0"><button class="btn" id="retryBtn" type="button">重试</button></p>
+        <p style="font-size:12px;margin:8px 0 0">本工具不使用任何模拟或编造数据：拿不到实盘行情时，只显示错误，不给出信号。</p>
+      </div>
+
+      <main id="app" class="hidden">
+        <!-- verdict -->
+        <section class="verdict flat" id="verdictBox" aria-live="polite">
+          <div class="verdict-row">
+            <div class="verdict-main">
+              <div class="verdict-kicker">综合建议 · 15M ×25% ＋ 1H ×45% ＋ 4H ×30%</div>
+              <div class="verdict-word" id="verdictWord">观望</div>
+              <div class="verdict-sub" id="verdictSub"></div>
+            </div>
+            <div class="verdict-scorebox">
+              <div class="verdict-score"><span id="totalScore">0</span><small> / 100</small></div>
+              <div class="verdict-scorelabel">综合多空评分（-100 强空 ～ +100 强多）</div>
+            </div>
+          </div>
+          <div class="gauge">
+            <div class="gauge-track">
+              <div class="gauge-zero"></div>
+              <div class="gauge-marker" id="gaugeMarker" style="left:50%"></div>
+            </div>
+            <div class="gauge-scale"><span>-100</span><span>-40</span><span>-20</span><span>0</span><span>+20</span><span>+40</span><span>+100</span></div>
+            <div class="gauge-zones"><span>强推做空 ≤-40</span><span>推荐做空</span><span>观望 ±20</span><span>推荐做多</span><span>强推做多 ≥+40</span></div>
+          </div>
+          <div class="tfmix" id="tfMix"></div>
+          <div class="conflict-note hidden" id="conflictNote">⚠ <b>周期冲突：</b>1 小时与 4 小时方向相反且强度都超过 25 分，大周期和小周期在打架。按规则强制降级为「观望」——等其中一个周期转向、或价格确认突破关键位后再行动，不要在两个方向之间猜。</div>
+        </section>
+
+        <!-- chart -->
+        <section class="chartcard">
+          <div class="chart-head">
+            <h2>1 小时 K 线（最近 72 根 · 已收盘）与均线</h2>
+            <div class="legend">
+              <span class="lg"><i style="background:#e8eaed"></i>收盘价</span>
+              <span class="lg"><i style="background:#f0b90b"></i>EMA 21</span>
+              <span class="lg"><i style="background:#7cc4ff"></i>EMA 50</span>
+              <span class="lg"><i style="background:#0ecb81"></i>支撑（50 周期低点）</span>
+              <span class="lg"><i style="background:#f6465d"></i>阻力（50 周期高点）</span>
+            </div>
+          </div>
+          <div id="chartHost"></div>
+        </section>
+
+        <!-- timeframe cards -->
+        <h2 class="sec-title">三周期算法投票明细</h2>
+        <p class="sec-sub">每个周期由 9 个主流算法独立投票（-1 强空 ～ +1 强多），按权重汇总后再乘 ADX 行情状态系数：ADX &lt; 20 打六折、20–25 打 85 折、≥ 25 全额计入，避免在横盘里被假信号反复打脸。</p>
+        <div class="tfgrid" id="tfGrid"></div>
+
+        <!-- risk plan -->
+        <section class="risk">
+          <h2>风控计划</h2>
+          <p class="sub">止损 / 止盈按 1 小时 ATR(14) 计算，下单即附止损和止盈：止损 = 入场价 ∓ 1.5×ATR，止盈一 = ±1.5×ATR（盈亏比 1:1 先保本），止盈二 = ±2.5×ATR（盈亏比 1:1.67）。仓位按「单笔最多亏 账户权益 × 风险%」反推，并受逐仓 10x（用户设定）上限约束：名义价值不超过账户权益 × 10。</p>
+          <div class="risk-inputs">
+            <div class="field">
+              <label for="equityInput">账户权益</label>
+              <div class="inwrap"><input id="equityInput" type="number" inputmode="decimal" min="0" step="any" value="133.63" /><span class="unit">USDT</span></div>
+            </div>
+            <div class="field">
+              <label for="riskInput">单笔风险</label>
+              <div class="inwrap"><input id="riskInput" type="number" inputmode="decimal" min="0.1" max="10" step="0.1" value="5" /><span class="unit">% 权益</span></div>
+            </div>
+            <div class="field">
+              <label>参考杠杆（逐仓 · 用户设定）</label>
+              <div class="inwrap" style="font-family:var(--mono);font-size:15px;padding:8px 2px">10x <span class="unit" style="font-family:var(--sans)">逐仓（用户设定）· 名义仓位上限 = 权益 × 10</span></div>
+            </div>
+          </div>
+          <div id="planHost"></div>
+        </section>
+
+        <!-- method + disclaimer -->
+        <section class="method">
+          <h2>算法与规则说明</h2>
+          <ul>
+            <li><b>九个算法（权重）：</b>EMA 趋势排列 9/21/50（15）、MA 均线交叉 5/20（10）、MACD 12/26/9（15）、RSI 14（10）、布林带 20/2 按 %B 投票（10）、随机指标 Stochastic 14/3（10）、Supertrend 10/3（15）、ROC 动量 10 周期（10）、VWAP 偏离（5）。只使用已收盘确认的 K 线计算，避免盘中信号闪烁。EMA 以首根收盘价为种子递推，RSI / ATR / ADX 按 Wilder 口径计算，与 Python 参考引擎 quant_tool.py 逐项一致。</li>
+            <li><b>布林带双模式：</b>ADX ≥ 25 按趋势模式：%B &gt; 0.8 投 +0.8、%B &lt; 0.2 投 −0.8、中间投 %B − 0.5；ADX &lt; 25 按震荡均值回归：%B &gt; 0.95 投 −0.8、%B &lt; 0.05 投 +0.8、中间投 0。</li>
+            <li><b>RSI 防追涨杀跌：</b>RSI 在 55–70 给 +0.7，冲过 70 只给 +0.3（超买谨慎）；30–45 给 −0.7，跌破 30 只给 −0.3（超卖谨慎）；45–55 之间按 (RSI − 50) / 25 线性投票。</li>
+            <li><b>行情状态过滤：</b>每个周期先算 ADX(14)：≥25 趋势市信号全额计入，20–25 过渡打 85 折，&lt;20 震荡市打 6 折。</li>
+            <li><b>数据：</b>OKX 公开接口（BTC-USDT-SWAP 永续），页面打开即拉取，每 60 秒自动刷新；页面上方显示最后更新时间。信号只在你打开本页时计算，不构成任何时刻的实时喊单。</li>
+          </ul>
+        </section>
+        <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓 10x（用户设定）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
+        <p class="foot">数据源：OKX 公开行情接口 · 本页不下单、不托管资金、不保存你的任何输入</p>
+      </main>
+    </div>
+
+    <script>
+    "use strict";
+    /* ================= data ================= */
+    var API = "https://www.okx.com";
+    var UNLOCKED = false; /* access gate: tool stays inert until the PIN check passes */
+    var state = { tf: {}, ticker: null, fundingRate: null, lastUpdate: null, timer: null, countdown: 60, busy: false };
+
+    function fmt(n, d){ if(n==null || !isFinite(n)) return "—"; d = (d==null?1:d); return pyRound(n, d).toLocaleString("en-US",{minimumFractionDigits:d, maximumFractionDigits:d}); }
+    function fmtPx(n){ return fmt(n,1); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+    function signTxt(v){ return (v>0?"+":"") + v; }
+
+    function fetchJSON(url){
+      return fetch(url, { method:"GET" }).then(function(r){
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function(j){
+        if(j.code !== "0") throw new Error("OKX 返回错误 " + j.code + " " + (j.msg||""));
+        return j.data;
+      });
+    }
+
+    /* OKX candle row: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm] — API returns newest first */
+    function parseCandles(rows){
+      var out = [];
+      for(var i=0;i<rows.length;i++){
+        var r = rows[i];
+        if(r[8] !== "1") continue; /* only confirmed (closed) candles */
+        out.push({ ts:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5] });
+      }
+      out.reverse(); /* newest last */
+      return out;
+    }
+
+    /* ================= indicators (exact port of quant_tool.py) ================= */
+    /* Seeding conventions match the Python reference exactly:
+       EMA seeded with the FIRST close value (not SMA-seeded); RSI/ATR use the
+       Python Wilder recursions; ADX uses Wilder-sum smoothing. Do not change
+       these conventions — they are the usual source of score divergence. */
+    function pyRound(x, d){
+      /* Correctly-rounded decimal rounding of the exact binary value (via
+         toFixed), matching Python round() — a naive x*10^k round loses the
+         just-below-the-tie cases (e.g. -54.949999… must give -54.9, not -55.0). */
+      return parseFloat(x.toFixed(d));
+    }
+    /* Python 3.12 sum() uses Neumaier compensated summation — mirror it so
+       weighted totals land on the same double as the Python reference. */
+    function neumaierSum(vals){
+      var s = 0, c = 0;
+      for(var i=0;i<vals.length;i++){
+        var x = vals[i], t = s + x;
+        if(Math.abs(s) >= Math.abs(x)) c += (s - t) + x; else c += (x - t) + s;
+        s = t;
+      }
+      return s + c;
+    }
+    function smaArr(v, p){
+      var out = new Array(v.length).fill(null), s = 0;
+      for(var i=0;i<v.length;i++){ s += v[i]; if(i>=p) s -= v[i-p]; if(i>=p-1) out[i] = s/p; }
+      return out;
+    }
+    function emaSeries(v, p){
+      var k = 2/(p+1), out = [v[0]];
+      for(var i=1;i<v.length;i++) out.push(out[i-1] + k*(v[i]-out[i-1]));
+      return out;
+    }
+    function emaArr(v, p){ return emaSeries(v, p); }
+    function lastVal(arr){ for(var i=arr.length-1;i>=0;i--){ if(arr[i]!=null && isFinite(arr[i])) return arr[i]; } return null; }
+    function lastTwo(arr){ var vals=[]; for(var i=arr.length-1;i>=0 && vals.length<2;i--){ if(arr[i]!=null && isFinite(arr[i])) vals.push(arr[i]); } return vals; }
+
+    function rsiWilder(closes, p){
+      p = p || 14;
+      var gains = [0], losses = [0], i, d;
+      for(i=1;i<closes.length;i++){ d = closes[i]-closes[i-1]; gains.push(d>0?d:0); losses.push(d<0?-d:0); }
+      var ag = 0, al = 0;
+      for(i=1;i<=p;i++){ ag += gains[i]; al += losses[i]; }
+      ag /= p; al /= p;
+      for(i=p;i<closes.length;i++){
+        if(i > p){ ag = (ag*(p-1) + gains[i])/p; al = (al*(p-1) + losses[i])/p; }
+      }
+      return 100 - 100/(1 + (al > 0 ? ag/al : 100));
+    }
+    function trueRanges(cs){
+      var tr = new Array(cs.length).fill(null);
+      for(var i=0;i<cs.length;i++){
+        if(i===0){ tr[i] = cs[i].h - cs[i].l; continue; }
+        tr[i] = Math.max(cs[i].h-cs[i].l, Math.abs(cs[i].h-cs[i-1].c), Math.abs(cs[i].l-cs[i-1].c));
+      }
+      return tr;
+    }
+    function atrSeries(cs, p){
+      var tr = trueRanges(cs), out = [tr[0]];
+      for(var i=1;i<tr.length;i++) out.push(out[i-1] + (tr[i]-out[i-1])/p);
+      return out;
+    }
+    function atrWilder(cs, p){ var s = atrSeries(cs, p); return s[s.length-1]; }
+    function adxWilder(cs, p){
+      p = p || 14;
+      var n = cs.length, tr = trueRanges(cs);
+      var pdm = [0], mdm = [0];
+      for(var i=1;i<n;i++){
+        var up = cs[i].h - cs[i-1].h, dn = cs[i-1].l - cs[i].l;
+        pdm.push((up>dn && up>0) ? up : 0);
+        mdm.push((dn>up && dn>0) ? dn : 0);
+      }
+      function wild(v){
+        var out = [0], j;
+        for(j=0;j<p;j++) out[0] += v[j];
+        for(var i=p;i<v.length;i++) out.push(out[out.length-1] - out[out.length-1]/p + v[i]);
+        return out;
+      }
+      var sTR = wild(tr), sP = wild(pdm), sM = wild(mdm), dx = [];
+      for(var k=0;k<sTR.length;k++){
+        var pdi = 100*sP[k]/sTR[k], mdi = 100*sM[k]/sTR[k];
+        dx.push((pdi+mdi) > 0 ? 100*Math.abs(pdi-mdi)/(pdi+mdi) : 0);
+      }
+      var adx = 0, m;
+      for(m=0;m<p;m++) adx += dx[m];
+      adx /= p;
+      for(var q=p;q<dx.length;q++) adx = adx + (dx[q]-adx)/p;
+      var last = sTR.length-1;
+      return { adx: adx, pdi: 100*sP[last]/sTR[last], mdi: 100*sM[last]/sTR[last] };
+    }
+    function macdCalc(closes){
+      var e12 = emaSeries(closes,12), e26 = emaSeries(closes,26), line = [], i;
+      for(i=0;i<closes.length;i++) line.push(e12[i]-e26[i]);
+      var sig = emaSeries(line, 9), n = closes.length;
+      return { dif: line[n-1], dea: sig[n-1], hist: line[n-1]-sig[n-1], histPrev: line[n-2]-sig[n-2] };
+    }
+    function bollinger(closes, p, mult){
+      var sma = smaArr(closes,p), i = closes.length-1, mid = sma[i], s = 0, j;
+      for(j=i-p+1;j<=i;j++) s += Math.pow(closes[j]-mid, 2);
+      var sd = Math.sqrt(s/p), up = mid + mult*sd, lo = mid - mult*sd;
+      return { mid: mid, upper: up, lower: lo, pctB: sd > 0 ? (closes[i] - lo)/(up - lo) : 0.5 };
+    }
+    function stochastic(cs, kp, smooth, dp){
+      var n = cs.length, raw = [], i, j;
+      for(i=0;i<n;i++){
+        if(i < kp-1){ raw.push(50); continue; }
+        var hh = -Infinity, ll = Infinity;
+        for(j=i-kp+1;j<=i;j++){ hh = Math.max(hh, cs[j].h); ll = Math.min(ll, cs[j].l); }
+        raw.push(hh > ll ? 100*(cs[i].c - ll)/(hh - ll) : 50);
+      }
+      var kArr = smaArr(raw, smooth);
+      var kFilled = kArr.map(function(x){ return x==null ? 50 : x; });
+      var dArr = smaArr(kFilled, dp);
+      return { k: lastVal(kArr), d: lastVal(dArr) };
+    }
+    function supertrend(cs, p, mult){
+      var atr = atrSeries(cs, p), ub = [], lb = [], st = [], trend = [1];
+      for(var i=0;i<cs.length;i++){
+        var mid = (cs[i].h + cs[i].l)/2, bu = mid + mult*atr[i], bl = mid - mult*atr[i];
+        if(i===0){ ub.push(bu); lb.push(bl); st.push(bl); continue; }
+        var pub = ub[ub.length-1], plb = lb[lb.length-1];
+        var cub = (bu < pub || cs[i-1].c > pub) ? bu : pub; ub.push(cub);
+        var clb = (bl > plb || cs[i-1].c < plb) ? bl : plb; lb.push(clb);
+        var prev = st[st.length-1], cur;
+        if(prev === cub && cs[i].c > cub) cur = clb;
+        else if(prev === clb && cs[i].c < clb) cur = cub;
+        else if(prev === clb) cur = clb;
+        else cur = cub;
+        st.push(cur); trend.push(cur === clb ? 1 : -1);
+      }
+      return { line: st[st.length-1], dir: trend[trend.length-1] };
+    }
+    function vwapCalc(cs, bars){
+      var seg = cs.slice(-bars), pv = 0, vv = 0;
+      for(var i=0;i<seg.length;i++){ var tp = (seg[i].h + seg[i].l + seg[i].c)/3; pv += tp*seg[i].v; vv += seg[i].v; }
+      return vv > 0 ? pv/vv : null;
+    }
+
+    /* ================= per-timeframe engine (quant_tool.py evaluate) ================= */
+    var VWAP_BARS = { "15m":96, "1H":24, "4H":42 };
+    function analyze(tfKey, candles){
+      var closes = candles.map(function(c){ return c.c; });
+      var price = closes[closes.length-1];
+      var adxR = adxWilder(candles, 14), adx = adxR.adx;
+      var atr = atrWilder(candles, 14);
+      var rsi = rsiWilder(closes, 14);
+      var e9 = lastVal(emaSeries(closes,9)), e21 = lastVal(emaSeries(closes,21)), e50 = lastVal(emaSeries(closes,50));
+      var s5 = lastVal(smaArr(closes,5)), s20 = lastVal(smaArr(closes,20));
+      var mc = macdCalc(closes);
+      var bb = bollinger(closes, 20, 2);
+      var st = stochastic(candles, 14, 3, 3);
+      var sup = supertrend(candles, 10, 3);
+      var rocPct = (price/closes[closes.length-11] - 1) * 100;
+      var vw = vwapCalc(candles, VWAP_BARS[tfKey]);
+      var vwDev = (price/vw - 1) * 100;
+      var seg50 = candles.slice(-50);
+      var resistance = Math.max.apply(null, seg50.map(function(c){ return c.h; }));
+      var support = Math.min.apply(null, seg50.map(function(c){ return c.l; }));
+
+      var votes = [];
+      function add(name, w, vote, key){ votes.push({ name: name, w: w, vote: pyRound(clamp(vote, -1, 1), 2), key: key }); }
+      /* 1 EMA trend (15): sign(EMA9>EMA21) + sign(EMA21>EMA50) + sign(price>EMA9), /3 */
+      var sEma = (e9 > e21 ? 1 : -1) + (e21 > e50 ? 1 : -1) + (price > e9 ? 1 : -1);
+      add("EMA 趋势排列", 15, sEma/3, "EMA9 " + fmtPx(e9) + " · EMA21 " + fmtPx(e21) + " · EMA50 " + fmtPx(e50));
+      /* 2 MA cross (10): binary */
+      add("MA 均线交叉", 10, s5 > s20 ? 1 : -1, "MA5 " + fmtPx(s5) + (s5 > s20 ? " > " : " < ") + "MA20 " + fmtPx(s20));
+      /* 3 MACD (15): 0.6 by hist sign + 0.4 by hist vs prev hist */
+      var vMacd = (mc.hist > 0 ? 0.6 : -0.6) + (mc.hist > mc.histPrev ? 0.4 : -0.4);
+      add("MACD", 15, vMacd, "柱 " + (mc.hist >= 0 ? "+" : "") + fmt(mc.hist, 1) + "（" + (Math.abs(mc.hist) > Math.abs(mc.histPrev) ? "放大" : "收缩") + "）· DIF " + fmt(mc.dif, 1) + " · DEA " + fmt(mc.dea, 1));
+      /* 4 RSI (10) */
+      var vRsi = (rsi >= 55 && rsi <= 70) ? 0.7 : rsi > 70 ? 0.3 : (rsi >= 30 && rsi <= 45) ? -0.7 : rsi < 30 ? -0.3 : (rsi - 50)/25;
+      add("RSI 相对强弱", 10, vRsi, "RSI14 " + fmt(rsi, 1) + (rsi > 70 ? " · 超买谨慎" : rsi < 30 ? " · 超卖谨慎" : ""));
+      /* 5 Bollinger %B (10): ADX>=25 trend mode, else mean-reversion */
+      var vBb, bbMode;
+      if(adx >= 25){ bbMode = "趋势模式"; vBb = bb.pctB > 0.8 ? 0.8 : bb.pctB < 0.2 ? -0.8 : (bb.pctB - 0.5); }
+      else { bbMode = "震荡模式（均值回归）"; vBb = bb.pctB > 0.95 ? -0.8 : bb.pctB < 0.05 ? 0.8 : 0; }
+      add("布林带 %B", 10, vBb, "%B " + fmt(bb.pctB, 2) + " · 上轨 " + fmtPx(bb.upper) + " · 下轨 " + fmtPx(bb.lower) + " · " + bbMode);
+      /* 6 Stochastic (10): Python ternary chain order preserved */
+      var vSto = (st.k > st.d && st.k < 80) ? 0.7 : (st.k < st.d && st.k > 20) ? -0.7 : (st.k <= 20 && st.k > st.d) ? 0.3 : (st.k >= 80 && st.k < st.d) ? -0.3 : 0;
+      add("Stochastic 随机指标", 10, vSto, "%K " + fmt(st.k, 1) + " · %D " + fmt(st.d, 1) + (st.k > 80 ? " · 超买区" : st.k < 20 ? " · 超卖区" : ""));
+      /* 7 Supertrend (15) */
+      add("Supertrend 趋势线", 15, sup.dir, "线 " + fmtPx(sup.line) + " · " + (sup.dir >= 0 ? "翻多（价格在趋势线上方）" : "翻空（价格在趋势线下方）"));
+      /* 8 ROC (10) */
+      add("ROC 动量", 10, clamp(rocPct/0.5, -1, 1), "ROC10 " + signTxt(fmt(rocPct, 2)) + "%");
+      /* 9 VWAP (5) */
+      add("VWAP 偏离", 5, clamp(vwDev/0.3, -1, 1), "VWAP " + fmtPx(vw) + " · 偏离 " + signTxt(fmt(vwDev, 2)) + "%");
+
+      var raw = neumaierSum(votes.map(function(v){ return v.vote * v.w; }))/100*100; /* Python: sum(vote*weight)/total_weight*100 */
+      var damp = adx < 20 ? 0.6 : adx < 25 ? 0.85 : 1.0;
+      var regime = adx >= 25 ? "趋势市" : adx >= 20 ? "过渡" : "震荡市";
+      return { tf: tfKey, price: price, votes: votes, raw: pyRound(raw, 1), score: pyRound(raw * damp, 1), damp: damp, adx: pyRound(adx, 1), atr: pyRound(atr, 1), rsi: pyRound(rsi, 1),
+               pdi: adxR.pdi, mdi: adxR.mdi, support: support, resistance: resistance, ema9: e9, vwap: vw, candles: candles, regime: regime };
+    }
+
+    /* ================= rendering ================= */
+    function el(id){ return document.getElementById(id); }
+    function scoreColor(v){ return v>5 ? "var(--green-text)" : v<-5 ? "var(--red-text)" : "var(--grey)"; }
+    function fmtScore(v){ return (v>0?"+":"") + fmt(v,1); }
+
+    function renderTop(){
+      var t = state.ticker; if(!t) return;
+      var last = +t.last, open = +t.open24h, chg = open ? (last-open)/open*100 : 0;
+      el("livePrice").textContent = fmtPx(last);
+      el("livePrice").style.color = chg>=0 ? "var(--green-text)" : "var(--red-text)";
+      var chEl = el("liveChg");
+      chEl.textContent = "24h " + (chg>=0?"+":"") + fmt(chg,2) + "%";
+      chEl.className = "live-chg num " + (chg>=0?"up":"down");
+      el("high24").textContent = fmtPx(+t.high24h);
+      el("low24").textContent = fmtPx(+t.low24h);
+      el("vol24").textContent = fmt(+t.volCcy24h, 0);
+      el("funding").textContent = state.fundingRate==null ? "—" : fmt(state.fundingRate*100, 4) + "%";
+    }
+
+    function renderVerdict(total, conflict){
+      var box = el("verdictBox"), word, cls, sub;
+      if(conflict){ word="观望"; cls="flat"; }
+      else if(total>=40){ word="强推荐做多"; cls="long"; }
+      else if(total>=20){ word="推荐做多"; cls="long"; }
+      else if(total<=-40){ word="强推荐做空"; cls="short"; }
+      else if(total<=-20){ word="推荐做空"; cls="short"; }
+      else { word="观望"; cls="flat"; }
+      box.className = "verdict " + cls;
+      el("verdictWord").textContent = word;
+      el("totalScore").textContent = fmtScore(total);
+      el("totalScore").style.color = scoreColor(total);
+      el("gaugeMarker").style.left = ((total+100)/2) + "%";
+      var dirWord = total>5 ? "多头占优" : total<-5 ? "空头占优" : "多空基本均衡";
+      sub = conflict
+        ? "1H 与 4H 方向相反且都很强，综合分 " + fmtScore(total) + " 不作数——先观望，等周期方向统一再动手。"
+        : cls==="flat"
+          ? "综合分落在 -20 ～ +20 的无信号区（"+dirWord+"）。这种行情里硬开仓，胜率和盈亏比都不划算，空仓等待本身就是策略。"
+          : "综合分 " + fmtScore(total) + "，" + dirWord + "。下方有按 1H ATR 算好的入场 / 止损 / 止盈与仓位，严格按计划执行，不要盘中改止损。";
+      el("verdictSub").textContent = sub;
+      el("conflictNote").classList.toggle("hidden", !conflict);
+      var mix = [["15 分钟","25%",state.tf["15m"]],["1 小时","45%",state.tf["1H"]],["4 小时","30%",state.tf["4H"]]];
+      el("tfMix").innerHTML = mix.map(function(m){
+        var s = m[2] ? m[2].score : 0;
+        return '<span class="chip">'+m[0]+'（权重 '+m[1]+'）<b style="color:'+scoreColor(s)+'">'+fmtScore(s)+'</b></span>';
+      }).join("");
+      return cls;
+    }
+
+    function voteRow(v){
+      var pct = Math.abs(v.vote)*50;
+      var fill = v.vote>=0
+        ? '<div class="fill pos" style="width:'+pct+'%"></div>'
+        : '<div class="fill neg" style="width:'+pct+'%"></div>';
+      return '<tr><td><div class="algo-name">'+v.name+' <span class="w">权重'+v.w+'</span></div><div class="algo-key">'+v.key+'</div></td>' +
+        '<td><div class="votebar"><div class="zero"></div>'+fill+'</div></td>' +
+        '<td class="vote-num" style="color:'+scoreColor(v.vote*100)+'">'+(v.vote>0?"+":"")+fmt(v.vote,2)+'</td></tr>';
+    }
+
+    function renderTF(){
+      var labels = { "15m":"15 分钟", "1H":"1 小时", "4H":"4 小时" };
+      var order = ["15m","1H","4H"];
+      el("tfGrid").innerHTML = order.map(function(k){
+        var r = state.tf[k]; if(!r) return "";
+        var posPct = r.resistance===r.support ? 50 : clamp((r.price-r.support)/(r.resistance-r.support)*100, 0, 100);
+        var regCls = r.regime==="趋势市" ? "trend" : r.regime==="震荡市" ? "range" : "trans";
+        return '<article class="tfcard">' +
+          '<div class="tfcard-head"><h3>'+labels[k]+'</h3><span class="regime '+regCls+'">'+r.regime+' · ADX '+fmt(r.adx,1)+'</span>' +
+          '<div class="tfscore"><div class="v" style="color:'+scoreColor(r.score)+'">'+fmtScore(r.score)+'</div><div class="l">周期评分（已乘状态系数 ×'+fmt(r.damp,2)+'）</div></div></div>' +
+          '<div class="statgrid">' +
+            '<div class="stat"><span>RSI(14)</span><b>'+fmt(r.rsi,1)+'</b></div>' +
+            '<div class="stat"><span>ATR(14)</span><b>'+fmt(r.atr,1)+'</b></div>' +
+            '<div class="stat"><span>原始投票分（未打折）</span><b>'+fmtScore(r.raw)+'</b></div>' +
+            '<div class="stat"><span>现价（已收盘）</span><b>'+fmtPx(r.price)+'</b></div>' +
+          '</div>' +
+          '<div class="sr">支撑（50 周期）<b class="up">'+fmtPx(r.support)+'</b> · 阻力（50 周期）<b class="down">'+fmtPx(r.resistance)+'</b>' +
+          '<div class="bar"><i style="left:'+posPct+'%"></i></div><div style="font-size:11px;color:var(--faint)">现价在近 50 根区间的位置：'+fmt(posPct,0)+'%（越靠右越接近阻力）</div></div>' +
+          '<table class="votes"><thead><tr><th>算法 / 关键数值</th><th>投票</th><th class="r">值</th></tr></thead><tbody>' +
+          r.votes.map(voteRow).join("") +
+          '</tbody></table></article>';
+      }).join("");
+    }
+
+    /* 1H line chart as inline SVG: closes + EMA21 + EMA50 + S/R */
+    function renderChart(){
+      var r = state.tf["1H"]; if(!r) return;
+      var cs = r.candles.slice(-72), closes = cs.map(function(c){return c.c;});
+      var all = state.tf["1H"].candles.map(function(c){return c.c;});
+      var e21 = emaArr(all,21).slice(-72), e50 = emaArr(all,50).slice(-72);
+      var lo = Math.min.apply(null, closes.concat([r.support])), hi = Math.max.apply(null, closes.concat([r.resistance]));
+      var pad = (hi-lo)*0.06 || 10; lo -= pad; hi += pad;
+      var W=1060, H=260, PL=6, PR=64, PT=10, PB=22, iw=W-PL-PR, ih=H-PT-PB;
+      function X(i){ return PL + iw*i/(closes.length-1); }
+      function Y(v){ return PT + ih*(hi-v)/(hi-lo); }
+      function path(vals){ var d=""; for(var i=0;i<vals.length;i++){ if(vals[i]==null) continue; d += (d?"L":"M")+X(i).toFixed(1)+","+Y(vals[i]).toFixed(1)+" "; } return d; }
+      var ticks = [lo+ (hi-lo)*0.25, lo+(hi-lo)*0.5, lo+(hi-lo)*0.75];
+      var grid = ticks.map(function(t){ return '<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+Y(t)+'" y2="'+Y(t)+'" stroke="#232830" stroke-width="1"/><text x="'+(W-PR+8)+'" y="'+(Y(t)+3)+'">'+fmt(t,0)+'</text>'; }).join("");
+      var t0 = new Date(cs[0].ts), t1 = new Date(cs[cs.length-1].ts);
+      function dstr(d){ return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":00"; }
+      var s = '<svg class="chart-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="1小时收盘价走势图">' + grid +
+        '<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+Y(r.support)+'" y2="'+Y(r.support)+'" stroke="#0ecb81" stroke-width="1" stroke-dasharray="5 4"/>' +
+        '<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+Y(r.resistance)+'" y2="'+Y(r.resistance)+'" stroke="#f6465d" stroke-width="1" stroke-dasharray="5 4"/>' +
+        '<text x="'+(W-PR+8)+'" y="'+(Y(r.resistance)+3)+'" fill="#ff7d8f">'+fmt(r.resistance,0)+'</text>' +
+        '<text x="'+(W-PR+8)+'" y="'+(Y(r.support)+3)+'" fill="#2ee6a6">'+fmt(r.support,0)+'</text>' +
+        '<path d="'+path(e50)+'" fill="none" stroke="#7cc4ff" stroke-width="1.4"/>' +
+        '<path d="'+path(e21)+'" fill="none" stroke="#f0b90b" stroke-width="1.4"/>' +
+        '<path d="'+path(closes)+'" fill="none" stroke="#e8eaed" stroke-width="1.8"/>' +
+        '<circle cx="'+X(closes.length-1)+'" cy="'+Y(closes[closes.length-1])+'" r="3.5" fill="#fff"/>' +
+        '<text x="'+PL+'" y="'+(H-6)+'">'+dstr(t0)+'</text>' +
+        '<text x="'+(W-PR-90)+'" y="'+(H-6)+'">'+dstr(t1)+'</text></svg>';
+      el("chartHost").innerHTML = s;
+    }
+
+    function renderPlan(verdictCls){
+      var host = el("planHost");
+      var h1 = state.tf["1H"];
+      if(!h1 || !state.ticker){ host.innerHTML=""; return; }
+      if(verdictCls==="flat"){
+        host.innerHTML = '<div class="flat-note">当前综合建议为<b style="color:var(--text)">观望</b>，不生成入场计划。参考：1 小时 ATR(14) 为 <b class="num" style="color:var(--text)">'+fmt(h1.atr,1)+' USDT</b>，等综合分走出 ±20 区间、或 1H 与 4H 方向统一后再看计划。</div>';
+        return;
+      }
+      var isLong = verdictCls==="long";
+      var entry = +state.ticker.last, atr = h1.atr, dist = 1.5*atr;
+      var sl = isLong ? entry-dist : entry+dist;
+      var tp1 = isLong ? entry+dist : entry-dist;
+      var tp2 = isLong ? entry+2.5*atr : entry-2.5*atr;
+      var equity = parseFloat(el("equityInput").value) || 0;
+      var riskPct = parseFloat(el("riskInput").value) || 0;
+      var riskAmt = equity*riskPct/100;
+      var sizeBtc = dist>0 ? riskAmt/dist : 0;
+      var notional = sizeBtc*entry;
+      var notionalCap = equity*10;
+      var capped = false;
+      if(notionalCap>0 && notional>notionalCap){ notional = notionalCap; sizeBtc = entry>0 ? notional/entry : 0; capped = true; }
+      var margin = notional/10;
+      var caution = "";
+      if(!isLong && (entry - h1.support) / atr < 1.0){
+        caution = '<div class="caution"><b>⚠ 贴近支撑，不要追空：</b>现价距 1 小时 50 周期支撑 '+fmtPx(h1.support)+' 只剩 '+fmt(entry-h1.support,1)+' USDT，不足 1×ATR（'+fmt(atr,1)+'）。在这里追空很容易被支撑反弹扫掉止损。等反弹到 EMA9（'+fmtPx(h1.ema9)+'）/ VWAP（'+fmtPx(h1.vwap)+'）附近再考虑，或等 1 小时收盘确认跌破支撑后再进。</div>';
+      }
+      if(isLong && (h1.resistance - entry) / atr < 1.0){
+        caution = '<div class="caution"><b>⚠ 贴近阻力，不要追多：</b>现价距 1 小时 50 周期阻力 '+fmtPx(h1.resistance)+' 只剩 '+fmt(h1.resistance-entry,1)+' USDT，不足 1×ATR（'+fmt(atr,1)+'）。在这里追多很容易被阻力压回扫掉止损。等回踩到 EMA9（'+fmtPx(h1.ema9)+'）/ VWAP（'+fmtPx(h1.vwap)+'）附近再考虑，或等 1 小时收盘确认站上阻力后再进。</div>';
+      }
+      host.innerHTML =
+        '<div class="plan-grid">' +
+          '<div class="plan-cell"><span>入场价（现价）</span><b>'+fmtPx(entry)+'</b><small>'+(isLong?"做多 LONG":"做空 SHORT")+' · 限价单可挂 EMA9 / VWAP 回踩位</small></div>' +
+          '<div class="plan-cell sl"><span>止损 SL（1.5×ATR · 下单即附）</span><b>'+fmtPx(sl)+'</b><small>下单即附止损 · 距入场 '+fmt(dist,1)+' USDT · 触发即离场，不移损扛单</small></div>' +
+          '<div class="plan-cell tp"><span>止盈一 TP1（1.5×ATR · 下单即附）</span><b>'+fmtPx(tp1)+'</b><small>下单即附止盈 · 盈亏比 1 : 1 · 到价先平一半并把止损移到入场价</small></div>' +
+          '<div class="plan-cell tp"><span>止盈二 TP2（2.5×ATR · 下单即附）</span><b>'+fmtPx(tp2)+'</b><small>下单即附止盈 · 盈亏比 1 : 1.67 · 剩余仓位目标</small></div>' +
+        '</div>' +
+        '<div class="size-row">' +
+          '<span>单笔风险金额 <b>'+fmt(riskAmt,2)+' USDT</b></span>' +
+          '<span>建议仓位 <b>'+fmt(sizeBtc,4)+' BTC</b></span>' +
+          '<span>名义价值 <b>'+fmt(notional,2)+' USDT</b></span>' +
+          '<span>名义上限（权益 × 10） <b>'+fmt(notionalCap,2)+' USDT</b>'+(capped?' · 已按逐仓 10x 上限截断':'')+'</span>' +
+          '<span>逐仓 10x 保证金（用户设定） <b>'+fmt(margin,2)+' USDT</b></span>' +
+          '<span>1H ATR <b>'+fmt(atr,1)+' USDT</b></span>' +
+        '</div>' + caution;
+    }
+
+    /* ================= fetch & cycle ================= */
+    function loadAll(){
+      if(state.busy || !UNLOCKED) return;
+      state.busy = true;
+      el("refreshBtn").disabled = true;
+      var p = Promise.all([
+        fetchJSON(API + "/api/v5/market/ticker?instId=BTC-USDT-SWAP"),
+        fetchJSON(API + "/api/v5/public/funding-rate?instId=BTC-USDT-SWAP"),
+        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=15m&limit=300"),
+        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1H&limit=300"),
+        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=4H&limit=300")
+      ]);
+      p.then(function(res){
+        state.ticker = res[0][0];
+        state.fundingRate = res[1] && res[1][0] ? +res[1][0].fundingRate : null;
+        state.tf["15m"] = analyze("15m", parseCandles(res[2]));
+        state.tf["1H"] = analyze("1H", parseCandles(res[3]));
+        state.tf["4H"] = analyze("4H", parseCandles(res[4]));
+        state.lastUpdate = new Date();
+        var total = neumaierSum([state.tf["15m"].score*0.25, state.tf["1H"].score*0.45, state.tf["4H"].score*0.30]);
+        var s1 = state.tf["1H"].score, s4 = state.tf["4H"].score;
+        var conflict = (s1>25 && s4<-25) || (s1<-25 && s4>25);
+        renderTop(); renderTF(); renderChart();
+        var cls = renderVerdict(total, conflict);
+        renderPlan(cls);
+        el("loadingBox").classList.add("hidden");
+        el("errorBox").classList.add("hidden");
+        el("app").classList.remove("hidden");
+        el("statusDot").className = "dot live";
+        state.countdown = 60;
+        el("statusText").textContent = "实盘已连接 · 更新于 " + state.lastUpdate.toLocaleTimeString("zh-CN",{hour12:false}) + " · 60s 后自动刷新";
+      }).catch(function(err){
+        el("loadingBox").classList.add("hidden");
+        if(!state.lastUpdate){ el("app").classList.add("hidden"); el("errorBox").classList.remove("hidden"); }
+        el("errorMsg").textContent = "错误信息：" + (err && err.message ? err.message : err) + "。请检查网络后重试。";
+        el("statusDot").className = "dot err";
+        el("statusText").textContent = "连接失败" + (state.lastUpdate ? "（仍显示上次数据）" : "");
+      }).then(function(){
+        state.busy = false;
+        el("refreshBtn").disabled = false;
+      });
+    }
+
+    el("refreshBtn").addEventListener("click", loadAll);
+    el("retryBtn").addEventListener("click", function(){ el("errorBox").classList.add("hidden"); if(!state.lastUpdate) el("loadingBox").classList.remove("hidden"); loadAll(); });
+    el("equityInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
+    el("riskInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
+
+    setInterval(function(){
+      if(!state.lastUpdate || state.busy) return;
+      state.countdown--;
+      if(state.countdown<=0){ loadAll(); return; }
+      el("statusText").textContent = "实盘已连接 · 更新于 " + state.lastUpdate.toLocaleTimeString("zh-CN",{hour12:false}) + " · " + state.countdown + "s 后自动刷新";
+    }, 1000);
+
+    /* ================= access gate ================= */
+    /* Only the SHA-256 of the access PIN is stored here — never the PIN itself.
+       The unlock token saved on this device is bound to that same hash. */
+    var PIN_HASH = "da3ebdfa3c65227905ee11962ff3ca05118192da6a7787b415ac0f068c112506";
+    var TOKEN_KEY = "qt_gate_token_v1";
+
+    function sha256Hex(str){
+      if(window.crypto && crypto.subtle && crypto.subtle.digest){
+        return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function(buf){
+          var bytes = new Uint8Array(buf), hex = "";
+          for(var i=0;i<bytes.length;i++) hex += ("0" + bytes[i].toString(16)).slice(-2);
+          return hex;
+        });
+      }
+      return Promise.resolve(sha256Sync(str));
+    }
+    /* Compact synchronous SHA-256, used only if WebCrypto is unavailable. */
+    function sha256Sync(ascii){
+      function rr(v,a){ return (v>>>a)|(v<<(32-a)); }
+      var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+      var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+      var bytes=[]; for(var bi=0;bi<ascii.length;bi++) bytes.push(ascii.charCodeAt(bi)&0xff);
+      var bitLen=bytes.length*8;
+      bytes.push(0x80); while(bytes.length%64!==56) bytes.push(0);
+      for(var li=7;li>=0;li--) bytes.push(Math.floor(bitLen/Math.pow(2,8*li))&0xff);
+      for(var off=0;off<bytes.length;off+=64){
+        var w=new Array(64), t;
+        for(t=0;t<16;t++) w[t]=(bytes[off+t*4]<<24)|(bytes[off+t*4+1]<<16)|(bytes[off+t*4+2]<<8)|bytes[off+t*4+3];
+        for(t=16;t<64;t++){ var s0=rr(w[t-15],7)^rr(w[t-15],18)^(w[t-15]>>>3), s1=rr(w[t-2],17)^rr(w[t-2],19)^(w[t-2]>>>10); w[t]=(w[t-16]+s0+w[t-7]+s1)|0; }
+        var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+        for(t=0;t<64;t++){
+          var S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^(~e&g), t1=(h+S1+ch+K[t]+w[t])|0;
+          var S0=rr(a,2)^rr(a,13)^rr(a,22), mj=(a&b)^(a&c)^(b&c), t2=(S0+mj)|0;
+          h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+        }
+        H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+      }
+      return H.map(function(x){ return ("00000000"+(x>>>0).toString(16)).slice(-8); }).join("");
+    }
+
+    function unlock(){
+      if(UNLOCKED) return;
+      UNLOCKED = true;
+      el("gate").hidden = true;
+      loadAll();
+    }
+
+    (function initGate(){
+      var gate = el("gate"), form = el("gateForm"), pin = el("gatePin"), err = el("gateErr"), btn = el("gateBtn");
+      var saved = null;
+      try { saved = window.localStorage.getItem(TOKEN_KEY); } catch(e) {}
+      sha256Hex("qt-unlock:" + PIN_HASH).then(function(token){
+        if(saved && saved === token){ unlock(); return; }
+        pin.focus();
+        form.addEventListener("submit", function(ev){
+          ev.preventDefault();
+          var val = pin.value;
+          if(!/^\d{6}$/.test(val)){ err.textContent = "请输入 6 位数字密码"; pin.select(); return; }
+          btn.disabled = true;
+          sha256Hex(val).then(function(h){
+            btn.disabled = false;
+            if(h === PIN_HASH){
+              try { window.localStorage.setItem(TOKEN_KEY, token); } catch(e) {}
+              err.textContent = "";
+              unlock();
+            } else {
+              err.textContent = "密码不正确，请重新输入";
+              pin.value = "";
+              pin.classList.remove("err"); void pin.offsetWidth; pin.classList.add("err");
+              pin.focus();
+            }
+          });
+        });
+      });
+    })();
+    </script>
+  </body>
+</html>
