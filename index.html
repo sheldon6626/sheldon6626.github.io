@@ -48,6 +48,9 @@
       .btn:hover{border-color:var(--grey)}
       .btn:active{transform:translateY(1px)}
       .btn:disabled{opacity:.5;cursor:wait}
+      .symswitch{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+      .symswitch button{appearance:none;border:0;background:var(--panel2);color:var(--muted);font-family:var(--sans);font-size:13px;font-weight:700;padding:7px 14px;cursor:pointer}
+      .symswitch button.on{background:var(--amber);color:#0a0c0f}
 
       /* ---------- states ---------- */
       .statebox{margin:28px 0;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:34px 20px;text-align:center;color:var(--muted)}
@@ -206,7 +209,11 @@
 
     <div class="topbar">
       <div class="topbar-in">
-        <div class="pair"><b>BTCUSDT</b><span class="tag">永续</span><span class="src">OKX 实盘行情</span></div>
+        <div class="pair"><b id="pairName">BTCUSDT</b><span class="tag">永续</span><span class="src">OKX 实盘行情</span></div>
+        <div class="symswitch" role="group" aria-label="币种切换">
+          <button type="button" id="symBtc" class="on">BTC</button>
+          <button type="button" id="symEth">ETH</button>
+        </div>
         <div>
           <div class="live-price num" id="livePrice">—</div>
           <div class="live-chg num" id="liveChg">24h —</div>
@@ -215,7 +222,7 @@
           <div class="tstat"><span>24h 最高</span><b id="high24">—</b></div>
           <div class="tstat"><span>24h 最低</span><b id="low24">—</b></div>
           <div class="tstat"><span>资金费率 / 8h</span><b id="funding">—</b></div>
-          <div class="tstat"><span>24h 成交量 (BTC)</span><b id="vol24">—</b></div>
+          <div class="tstat"><span id="volLabel">24h 成交量 (BTC)</span><b id="vol24">—</b></div>
         </div>
         <div class="topright">
           <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">正在连接…</span></div>
@@ -317,7 +324,7 @@
             <li><b>布林带双模式：</b>ADX ≥ 25 按趋势模式：%B &gt; 0.8 投 +0.8、%B &lt; 0.2 投 −0.8、中间投 %B − 0.5；ADX &lt; 25 按震荡均值回归：%B &gt; 0.95 投 −0.8、%B &lt; 0.05 投 +0.8、中间投 0。</li>
             <li><b>RSI 防追涨杀跌：</b>RSI 在 55–70 给 +0.7，冲过 70 只给 +0.3（超买谨慎）；30–45 给 −0.7，跌破 30 只给 −0.3（超卖谨慎）；45–55 之间按 (RSI − 50) / 25 线性投票。</li>
             <li><b>行情状态过滤：</b>每个周期先算 ADX(14)：≥25 趋势市信号全额计入，20–25 过渡打 85 折，&lt;20 震荡市打 6 折。</li>
-            <li><b>数据：</b>OKX 公开接口（BTC-USDT-SWAP 永续），页面打开即拉取，每 60 秒自动刷新；页面上方显示最后更新时间。信号只在你打开本页时计算，不构成任何时刻的实时喊单。</li>
+            <li><b>数据：</b>OKX 公开接口（<span id="dataInst">BTC-USDT-SWAP</span> 永续），页面打开即拉取，每 60 秒自动刷新；页面上方显示最后更新时间。信号只在你打开本页时计算，不构成任何时刻的实时喊单。</li>
           </ul>
         </details>
         <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓 10x（用户设定）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
@@ -329,11 +336,21 @@
     "use strict";
     /* ================= data ================= */
     var API = "https://www.okx.com";
+    /* Tradable symbols: same engine, same rules — only the OKX instrument,
+       display unit and price decimals differ. */
+    var SYMS = {
+      BTC: { inst: "BTC-USDT-SWAP", pair: "BTCUSDT", unit: "BTC", pxDec: 1 },
+      ETH: { inst: "ETH-USDT-SWAP", pair: "ETHUSDT", unit: "ETH", pxDec: 2 }
+    };
+    var SYM_KEY = "qt_sym_v1";
+    var curSym = "BTC";
+    try { var savedSym = window.localStorage.getItem(SYM_KEY); if(savedSym && SYMS[savedSym]) curSym = savedSym; } catch(e) {}
+    function SYM(){ return SYMS[curSym]; }
     var UNLOCKED = false; /* access gate: tool stays inert until the PIN check passes */
-    var state = { tf: {}, ticker: null, fundingRate: null, lastUpdate: null, timer: null, countdown: 60, busy: false };
+    var state = { tf: {}, ticker: null, fundingRate: null, lastUpdate: null, timer: null, countdown: 60, busy: false, staleReload: false };
 
     function fmt(n, d){ if(n==null || !isFinite(n)) return "—"; d = (d==null?1:d); return pyRound(n, d).toLocaleString("en-US",{minimumFractionDigits:d, maximumFractionDigits:d}); }
-    function fmtPx(n){ return fmt(n,1); }
+    function fmtPx(n){ return fmt(n, SYM().pxDec); }
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function signTxt(v){ return (v>0?"+":"") + v; }
 
@@ -727,7 +744,7 @@
         '</div>' +
         '<div class="size-row">' +
           '<span>单笔风险金额 <b>'+fmt(riskAmt,2)+' USDT</b></span>' +
-          '<span>建议仓位 <b>'+fmt(sizeBtc,4)+' BTC</b></span>' +
+          '<span>建议仓位 <b>'+fmt(sizeBtc,4)+' '+SYM().unit+'</b></span>' +
           '<span>名义价值 <b>'+fmt(notional,2)+' USDT</b></span>' +
           '<span>名义上限（权益 × 10） <b>'+fmt(notionalCap,2)+' USDT</b>'+(capped?' · 已按逐仓 10x 上限截断':'')+'</span>' +
           '<span>逐仓 10x 保证金（用户设定） <b>'+fmt(margin,2)+' USDT</b></span>' +
@@ -740,14 +757,16 @@
       if(state.busy || !UNLOCKED) return;
       state.busy = true;
       el("refreshBtn").disabled = true;
+      var inst = SYM().inst;
       var p = Promise.all([
-        fetchJSON(API + "/api/v5/market/ticker?instId=BTC-USDT-SWAP"),
-        fetchJSON(API + "/api/v5/public/funding-rate?instId=BTC-USDT-SWAP"),
-        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=15m&limit=300"),
-        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1H&limit=300"),
-        fetchJSON(API + "/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=4H&limit=300")
+        fetchJSON(API + "/api/v5/market/ticker?instId=" + inst),
+        fetchJSON(API + "/api/v5/public/funding-rate?instId=" + inst),
+        fetchJSON(API + "/api/v5/market/candles?instId=" + inst + "&bar=15m&limit=300"),
+        fetchJSON(API + "/api/v5/market/candles?instId=" + inst + "&bar=1H&limit=300"),
+        fetchJSON(API + "/api/v5/market/candles?instId=" + inst + "&bar=4H&limit=300")
       ]);
       p.then(function(res){
+        if(inst !== SYM().inst){ state.staleReload = true; return; } /* symbol switched mid-flight: discard */
         state.ticker = res[0][0];
         state.fundingRate = res[1] && res[1][0] ? +res[1][0].fundingRate : null;
         state.tf["15m"] = analyze("15m", parseCandles(res[2]));
@@ -767,6 +786,7 @@
         state.countdown = 60;
         el("statusText").textContent = "实盘已连接 · 更新于 " + state.lastUpdate.toLocaleTimeString("zh-CN",{hour12:false}) + " · 60s 后自动刷新";
       }).catch(function(err){
+        if(inst !== SYM().inst){ state.staleReload = true; return; } /* stale request for the previous symbol */
         el("loadingBox").classList.add("hidden");
         if(!state.lastUpdate){ el("app").classList.add("hidden"); el("errorBox").classList.remove("hidden"); }
         el("errorMsg").textContent = "错误信息：" + (err && err.message ? err.message : err) + "。请检查网络后重试。";
@@ -775,10 +795,39 @@
       }).then(function(){
         state.busy = false;
         el("refreshBtn").disabled = false;
+        if(state.staleReload){ state.staleReload = false; loadAll(); }
       });
     }
 
     el("refreshBtn").addEventListener("click", loadAll);
+
+    /* ================= symbol switch ================= */
+    function applySym(){
+      var s = SYM();
+      el("pairName").textContent = s.pair;
+      el("volLabel").textContent = "24h 成交量 (" + s.unit + ")";
+      el("dataInst").textContent = s.inst;
+      el("symBtc").classList.toggle("on", curSym==="BTC");
+      el("symEth").classList.toggle("on", curSym==="ETH");
+      document.title = "实盘量化交易工具 · " + s.pair + " 永续信号";
+    }
+    function setSym(k){
+      if(!SYMS[k] || k===curSym) return;
+      curSym = k;
+      try { window.localStorage.setItem(SYM_KEY, k); } catch(e) {}
+      applySym();
+      /* reset per-symbol state so nothing from the other coin lingers */
+      state.tf = {}; state.ticker = null; state.fundingRate = null; state.lastUpdate = null; state.countdown = 60;
+      el("app").classList.add("hidden");
+      el("errorBox").classList.add("hidden");
+      el("loadingBox").classList.remove("hidden");
+      el("statusDot").className = "dot";
+      el("statusText").textContent = "正在连接…";
+      loadAll();
+    }
+    el("symBtc").addEventListener("click", function(){ setSym("BTC"); });
+    el("symEth").addEventListener("click", function(){ setSym("ETH"); });
+    applySym();
     el("retryBtn").addEventListener("click", function(){ el("errorBox").classList.add("hidden"); if(!state.lastUpdate) el("loadingBox").classList.remove("hidden"); loadAll(); });
     el("equityInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
     el("riskInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
