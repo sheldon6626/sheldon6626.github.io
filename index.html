@@ -193,6 +193,10 @@
       .pos-sum-upl{font-size:19px}
       .caution{margin-top:14px;border:1px solid rgba(240,185,11,.45);background:var(--amber-dim);border-radius:8px;padding:11px 14px;font-size:13.5px;color:#ffe08a}
       .caution b{color:#ffd75e}
+      /* ---------- header verdict ---------- */
+      .hv{margin-left:4px}
+      .hv-word{font-size:25px;font-weight:900;line-height:1.05;white-space:nowrap}
+      .hv-sub{font-size:11px;color:var(--faint);white-space:nowrap;margin-top:2px}
       .flat-note{border:1px dashed var(--line2);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13.5px}
 
       /* ---------- footer ---------- */
@@ -229,6 +233,10 @@
         <div>
           <div class="live-price num" id="livePrice">—</div>
           <div class="live-chg num" id="liveChg">24h —</div>
+        </div>
+        <div class="hv">
+          <div class="hv-word" id="hvWord">—</div>
+          <div class="hv-sub">综合建议 · <span class="num" id="hvScore">—</span></div>
         </div>
         <div class="topstats">
           <div class="tstat"><span>24h 最高</span><b id="high24">—</b></div>
@@ -643,6 +651,10 @@
       el("verdictWord").textContent = word;
       el("totalScore").textContent = fmtScore(total);
       el("totalScore").style.color = scoreColor(total);
+      el("hvWord").textContent = word;
+      el("hvWord").style.color = cls==="long" ? "var(--green-text)" : cls==="short" ? "var(--red-text)" : "var(--text)";
+      el("hvScore").textContent = fmtScore(total);
+      el("hvScore").style.color = scoreColor(total);
       el("gaugeMarker").style.left = ((total+100)/2) + "%";
       var dirWord = total>5 ? "多头占优" : total<-5 ? "空头占优" : "多空基本均衡";
       sub = conflict
@@ -843,6 +855,9 @@
       el("loadingBox").classList.remove("hidden");
       el("statusDot").className = "dot";
       el("statusText").textContent = "正在连接…";
+      el("hvWord").textContent = "计算中";
+      el("hvWord").style.color = "var(--faint)";
+      el("hvScore").textContent = "—";
       loadAll();
     }
     el("symBtc").addEventListener("click", function(){ setSym("BTC"); });
