@@ -184,6 +184,12 @@
       .pos-grid b{color:var(--text);font-family:var(--mono);font-weight:600}
       .pos-err{color:var(--red-text);font-size:13.5px;line-height:1.6}
       .pos-updated{color:var(--muted);font-size:12px;margin-top:10px}
+      .pos-card{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:14px 16px 12px;margin-top:12px}
+      .pos-pnl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:10px}
+      .pos-pnl-label{font-size:12px;color:var(--muted)}
+      .pos-pnl b{font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:.01em;line-height:1.1}
+      .pos-pnl-ratio{font-family:var(--mono);font-size:15px;font-weight:700}
+      .pos-sum-upl{font-size:19px}
       .caution{margin-top:14px;border:1px solid rgba(240,185,11,.45);background:var(--amber-dim);border-radius:8px;padding:11px 14px;font-size:13.5px;color:#ffe08a}
       .caution b{color:#ffd75e}
       .flat-note{border:1px dashed var(--line2);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13.5px}
@@ -979,7 +985,7 @@
       }
       var h = '<div class="pos-sum">' +
         '<span>总权益 <b>' + (isFinite(totalEq) ? fmt(totalEq, 2) : "—") + ' USD</b></span>' +
-        '<span>持仓未实现盈亏 <b class="' + (uplSum > 0 ? "up" : uplSum < 0 ? "down" : "") + '">' + (uplSum > 0 ? "+" : "") + fmt(uplSum, 2) + ' USDT</b></span>' +
+        '<span>持仓未实现盈亏 <b class="pos-sum-upl ' + (uplSum > 0 ? "up" : uplSum < 0 ? "down" : "") + '">' + (uplSum > 0 ? "+" : "") + fmt(uplSum, 2) + ' USDT</b></span>' +
         '<span>持仓数 <b>' + live.length + '</b></span>' +
       '</div>';
       if(!live.length) h += '<p class="pos-note">当前没有持仓。</p>';
@@ -990,15 +996,17 @@
         var baseUnit = inst.split("-")[0] || "";
         var upl = parseFloat(q.upl || 0) || 0;
         var uplRatio = parseFloat(q.uplRatio);
-        h += '<div class="pos-item"><div class="pos-item-head">' +
+        var uplCls = upl > 0 ? "up" : upl < 0 ? "down" : "";
+        h += '<div class="pos-card"><div class="pos-item-head">' +
           '<span class="pos-inst">' + posEsc(inst) + '</span>' +
           '<span class="pos-side ' + (isLong ? "long" : "short") + '">' + (isLong ? "做多" : "做空") + '</span>' +
           '<span class="pos-note">' + Math.abs(eff2) + ' 张' + (base !== null ? '（≈ ' + fmt(base, 4) + ' ' + posEsc(baseUnit) + '）' : '') + ' · ' + posEsc(q.lever || "—") + 'x · ' + (q.mgnMode === "cross" ? "全仓" : q.mgnMode === "isolated" ? "逐仓" : posEsc(q.mgnMode || "")) + '</span>' +
-        '</div><div class="pos-grid">' +
+        '</div>' +
+        '<div class="pos-pnl"><span class="pos-pnl-label">未实现盈亏</span><b class="' + uplCls + '">' + (upl > 0 ? "+" : "") + fmt(upl, 2) + ' USDT</b>' + (isFinite(uplRatio) ? '<span class="pos-pnl-ratio ' + uplCls + '">' + (uplRatio > 0 ? "+" : "") + fmt(uplRatio * 100, 1) + '%</span>' : '') + '</div>' +
+        '<div class="pos-grid">' +
           '<span>开仓均价 <b>' + fmt(parseFloat(q.avgPx), 2) + '</b></span>' +
           '<span>标记价格 <b>' + fmt(parseFloat(q.markPx), 2) + '</b></span>' +
           '<span>名义价值 <b>' + fmt(parseFloat(q.notionalUsd), 2) + ' USD</b></span>' +
-          '<span>未实现盈亏 <b class="' + (upl > 0 ? "up" : upl < 0 ? "down" : "") + '">' + (upl > 0 ? "+" : "") + fmt(upl, 2) + ' USDT' + (isFinite(uplRatio) ? '（' + (uplRatio > 0 ? "+" : "") + fmt(uplRatio * 100, 1) + '%）' : '') + '</b></span>' +
           (q.liqPx ? '<span>爆仓价 <b>' + fmt(parseFloat(q.liqPx), 2) + '</b></span>' : '') +
           '<span>盈亏平衡 <b>' + fmt(parseFloat(q.bePx), 2) + '</b></span>' +
         '</div></div>';
