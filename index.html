@@ -161,6 +161,7 @@
       /* ---------- my positions ---------- */
       .possec{margin-top:26px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:18px 20px}
       .possec h2{margin:0 0 2px;font-size:17px;font-weight:900}
+      .eq-sync{color:var(--green-text);font-size:11px;font-weight:700}
       .pos-sub{font-size:12px;color:var(--muted);font-weight:400;margin-left:8px}
       .pos-note{color:var(--muted);font-size:13px;line-height:1.6}
       .pos-form{max-width:420px}
@@ -312,7 +313,7 @@
           </details>
           <div class="risk-inputs">
             <div class="field">
-              <label for="equityInput">账户权益</label>
+              <label for="equityInput">账户权益 <span class="eq-sync" id="eqSyncTag"></span></label>
               <div class="inwrap"><input id="equityInput" type="number" inputmode="decimal" min="0" step="any" value="133.63" /><span class="unit">USDT</span></div>
             </div>
             <div class="field">
@@ -797,6 +798,7 @@
         renderTop(); renderTF(); renderChart();
         var cls = renderVerdict(total, conflict);
         renderPlan(cls);
+        syncEquityToPlan();
         el("loadingBox").classList.add("hidden");
         el("errorBox").classList.add("hidden");
         el("app").classList.remove("hidden");
@@ -868,7 +870,7 @@
        key is read-only, so it can look but never trade or withdraw. */
     var CRED_KEY = "qt_okx_cred_v1";
     var CTVAL = { "BTC-USDT-SWAP": 0.01, "ETH-USDT-SWAP": 0.1 };
-    var posState = { cred: null, busy: false };
+    var posState = { cred: null, busy: false, liveEq: null };
     var okxTimeOffset = null;
 
     function loadCred(){
@@ -1013,7 +1015,12 @@
       }
       h += '<div class="pos-actions"><button class="pos-btn" id="posRefresh" type="button">刷新持仓</button><button class="pos-btn" id="posWipe" type="button">清除本机凭证</button></div>' +
            '<p class="pos-updated">更新于 ' + new Date().toLocaleTimeString("zh-CN", { hour12: false }) + ' · 随页面 60 秒周期自动刷新 · 只读，不下单</p>';
+      var usdtEq = null;
+      var dets = b.details || [];
+      for(var di=0; di<dets.length; di++){ if(dets[di].ccy === "USDT"){ usdtEq = parseFloat(dets[di].eq); break; } }
+      posState.liveEq = (usdtEq !== null && isFinite(usdtEq)) ? usdtEq : totalEq;
       el("posHost").innerHTML = h;
+      syncEquityToPlan();
       el("posRefresh").addEventListener("click", function(){ refreshPositions(); });
       el("posWipe").addEventListener("click", function(){
         wipeCred(); posState.cred = null; renderPosSetup("本机凭证已清除。");
@@ -1027,6 +1034,21 @@
       el("posWipe2").addEventListener("click", function(){
         wipeCred(); posState.cred = null; renderPosSetup();
       });
+    }
+
+    /* Keep the risk plan honest: whenever a live balance has been read,
+       write the real USDT equity into the plan's equity input and re-render
+       the plan, so position sizing always uses the live account. */
+    function syncEquityToPlan(){
+      var v = posState.liveEq;
+      if(v === null || !isFinite(v)) return;
+      el("equityInput").value = v.toFixed(2);
+      var tag = el("eqSyncTag");
+      if(tag) tag.textContent = "· 已同步实盘";
+      if(state.ticker){
+        var box = el("verdictBox");
+        renderPlan(box.classList.contains("long") ? "long" : box.classList.contains("short") ? "short" : "flat");
+      }
     }
 
     function refreshPositions(){
