@@ -104,12 +104,12 @@
       .tfgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
       @media (max-width:960px){.tfgrid{grid-template-columns:1fr}}
       .tfcard{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px 16px 12px}
-      .tfcard-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-      .tfcard-head h3{margin:0;font-size:16px;font-weight:900}
-      .tfscore{margin-left:auto;text-align:right}
+      .tfcard-head{display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+      .tfcard-head h3{margin:0;font-size:16px;font-weight:900;white-space:nowrap;flex:none}
+      .tfscore{margin-left:auto;text-align:right;min-width:0}
       .tfscore .v{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1}
       .tfscore .l{font-size:10.5px;color:var(--faint)}
-      .regime{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px}
+      .regime{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px;white-space:nowrap;flex:none}
       .regime.trend{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(240,185,11,.35)}
       .regime.trans{color:var(--grey);background:var(--panel2);border:1px solid var(--line2)}
       .regime.range{color:#7cc4ff;background:rgba(124,196,255,.1);border:1px solid rgba(124,196,255,.3)}
