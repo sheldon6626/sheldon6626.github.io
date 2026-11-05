@@ -323,7 +323,7 @@
           <h2>风控计划</h2>
           <details class="fold-note">
             <summary>说明：止损 / 止盈与仓位计算<span class="fold-hint">点击展开</span></summary>
-            <p>止损 / 止盈按 1 小时 ATR(14) 计算，下单即附止损和止盈：止损 = 入场价 ∓ 1.5×ATR，止盈一 = ±1.5×ATR（盈亏比 1:1 先保本），止盈二 = ±2.5×ATR（盈亏比 1:1.67）。仓位按「单笔最多亏 账户权益 × 风险%」反推，并受逐仓 10x（用户设定）上限约束：名义价值不超过账户权益 × 10。</p>
+            <p>止损 / 止盈按 1 小时 ATR(14) 计算，下单即附止损和止盈：止损 = 入场价 ∓ 1.5×ATR，止盈一 = ±1.5×ATR（盈亏比 1:1 先保本），止盈二 = ±2.5×ATR（盈亏比 1:1.67）。仓位按「单笔最多亏 账户权益 × 风险%」反推，并受参考杠杆上限约束：名义价值不超过账户权益 × 杠杆倍数。</p>
           </details>
           <div class="risk-inputs">
             <div class="field">
@@ -335,8 +335,8 @@
               <div class="inwrap"><input id="riskInput" type="number" inputmode="decimal" min="0.1" max="10" step="0.1" value="5" /><span class="unit">% 权益</span></div>
             </div>
             <div class="field">
-              <label>参考杠杆（逐仓 · 用户设定）</label>
-              <div class="inwrap" style="font-family:var(--mono);font-size:15px;padding:8px 2px">10x <span class="unit" style="font-family:var(--sans)">逐仓（用户设定）· 名义仓位上限 = 权益 × 10</span></div>
+              <label for="levInput">参考杠杆（逐仓 · 可调）</label>
+              <div class="inwrap"><input id="levInput" type="number" inputmode="numeric" min="1" max="125" step="1" value="10" /><span class="unit">x · 名义上限 = 权益 × 杠杆</span></div>
             </div>
           </div>
           <div id="planHost"></div>
@@ -359,7 +359,7 @@
             <li><b>数据：</b>OKX 公开接口（<span id="dataInst">BTC-USDT-SWAP</span> 永续），页面打开即拉取，每 60 秒自动刷新；页面上方显示最后更新时间。信号只在你打开本页时计算，不构成任何时刻的实时喊单。</li>
           </ul>
         </details>
-        <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓 10x（用户设定）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
+        <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓杠杆默认 10x（上方可调）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
         <p class="foot">数据源：OKX 接口 · 本页不下单、不托管资金；持仓凭证按你的选择只保存在本机浏览器</p>
       </main>
     </div>
@@ -742,6 +742,8 @@
       el("chartHost").innerHTML = s;
     }
 
+    var LEV_KEY = "qt_lev_v1";
+    function lev(){ var v = parseFloat(el("levInput").value); if(!isFinite(v) || v<1) return 10; return Math.min(Math.floor(v), 125); }
     var planSel = { entry:true, sl:true, tp1:true, tp2:true };
     var lastPlan = null;
     function renderBundle(){
@@ -773,10 +775,11 @@
       var riskAmt = equity*riskPct/100;
       var sizeBtc = dist>0 ? riskAmt/dist : 0;
       var notional = sizeBtc*entry;
-      var notionalCap = equity*10;
+      var L = lev();
+      var notionalCap = equity*L;
       var capped = false;
       if(notionalCap>0 && notional>notionalCap){ notional = notionalCap; sizeBtc = entry>0 ? notional/entry : 0; capped = true; }
-      var margin = notional/10;
+      var margin = notional/L;
       var caution = "";
       if(!isLong && (entry - h1.support) / atr < 1.0){
         caution = '<div class="caution"><b>⚠ 贴近支撑，不要追空：</b>现价距 1 小时 50 周期支撑 '+fmtPx(h1.support)+' 只剩 '+fmt(entry-h1.support,1)+' USDT，不足 1×ATR（'+fmt(atr,1)+'）。在这里追空很容易被支撑反弹扫掉止损。等反弹到 EMA9（'+fmtPx(h1.ema9)+'）/ VWAP（'+fmtPx(h1.vwap)+'）附近再考虑，或等 1 小时收盘确认跌破支撑后再进。</div>';
@@ -799,8 +802,8 @@
           '<span>单笔风险金额 <b>'+fmt(riskAmt,2)+' USDT</b></span>' +
           '<span>建议仓位 <b>'+fmt(sizeBtc,4)+' '+SYM().unit+'</b></span>' +
           '<span>名义价值 <b>'+fmt(notional,2)+' USDT</b></span>' +
-          '<span>名义上限（权益 × 10） <b>'+fmt(notionalCap,2)+' USDT</b>'+(capped?' · 已按逐仓 10x 上限截断':'')+'</span>' +
-          '<span>逐仓 10x 保证金（用户设定） <b>'+fmt(margin,2)+' USDT</b></span>' +
+          '<span>名义上限（权益 × '+L+'） <b>'+fmt(notionalCap,2)+' USDT</b>'+(capped?' · 已按逐仓 '+L+'x 上限截断':'')+'</span>' +
+          '<span>逐仓 '+L+'x 保证金 <b>'+fmt(margin,2)+' USDT</b></span>' +
           '<span>1H ATR <b>'+fmt(atr,1)+' USDT</b></span>' +
         '</div>' + caution;
       renderBundle();
@@ -897,6 +900,8 @@
     el("symEth").addEventListener("click", function(){ setSym("ETH"); });
     applySym();
     el("retryBtn").addEventListener("click", function(){ el("errorBox").classList.add("hidden"); if(!state.lastUpdate) el("loadingBox").classList.remove("hidden"); loadAll(); });
+    try { var savedLev = window.localStorage.getItem(LEV_KEY); if(savedLev) el("levInput").value = savedLev; } catch(e) {}
+    el("levInput").addEventListener("input", function(){ try { window.localStorage.setItem(LEV_KEY, el("levInput").value); } catch(e) {} if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
     el("equityInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
     el("riskInput").addEventListener("input", function(){ if(state.ticker) { var box=el("verdictBox"); renderPlan(box.classList.contains("long")?"long":box.classList.contains("short")?"short":"flat"); } });
 
