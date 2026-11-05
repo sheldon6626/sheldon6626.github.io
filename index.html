@@ -150,7 +150,13 @@
       .field .unit{color:var(--faint);font-size:12px}
       .plan-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
       @media (max-width:860px){.plan-grid{grid-template-columns:1fr 1fr}}
-      .plan-cell{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:12px 14px}
+      .plan-cell{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:12px 38px 12px 14px;position:relative}
+      .plan-cell.off{opacity:.5}
+      .plan-ck{position:absolute;top:10px;right:10px;width:19px;height:19px;margin:0;accent-color:#f0b90b;cursor:pointer}
+      .bundle{margin-top:12px;border:1px dashed var(--line2);border-radius:8px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+      .bundle .b-t{font-size:12.5px;color:var(--muted)}
+      .bundle .b-t b{color:var(--text);font-family:var(--mono);font-weight:700}
+      .bundle-btn{margin-left:auto;background:var(--panel2);border:1px solid var(--line2);color:var(--faint);border-radius:8px;padding:9px 18px;font-size:14px;font-weight:700;cursor:not-allowed;opacity:.6}
       .plan-cell span{display:block;font-size:11.5px;color:var(--muted)}
       .plan-cell b{font-family:var(--mono);font-size:20px;font-weight:700}
       .plan-cell small{display:block;color:var(--faint);font-size:11px;margin-top:2px}
@@ -736,11 +742,24 @@
       el("chartHost").innerHTML = s;
     }
 
+    var planSel = { entry:true, sl:true, tp1:true, tp2:true };
+    var lastPlan = null;
+    function renderBundle(){
+      var bb = el("bundleBar"); if(!bb || !lastPlan) return;
+      var names = { entry:"入场", sl:"止损 SL", tp1:"止盈一 TP1", tp2:"止盈二 TP2" };
+      var keys = ["entry","sl","tp1","tp2"], picked = [];
+      for(var i=0;i<keys.length;i++){ if(planSel[keys[i]]) picked.push(names[keys[i]] + " " + fmtPx(lastPlan[keys[i]])); }
+      bb.innerHTML =
+        '<span class="b-t">' + (picked.length ? ('已选 <b>' + picked.length + '</b> 项：' + picked.join(" · ") + ' · 数量 <b>' + fmt(lastPlan.qty,4) + ' ' + lastPlan.unit + '</b>') : '未勾选任何一项') + '</span>' +
+        '<button type="button" class="bundle-btn" disabled>添加到实盘委托</button>' +
+        '<span class="b-t">实盘交易同步后启用 · 当前仅勾选预览，不会下单</span>';
+    }
     function renderPlan(verdictCls){
       var host = el("planHost");
       var h1 = state.tf["1H"];
       if(!h1 || !state.ticker){ host.innerHTML=""; return; }
       if(verdictCls==="flat"){
+        lastPlan = null;
         host.innerHTML = '<div class="flat-note">当前综合建议为<b style="color:var(--text)">观望</b>，不生成入场计划。参考：1 小时 ATR(14) 为 <b class="num" style="color:var(--text)">'+fmt(h1.atr,1)+' USDT</b>，等综合分走出 ±20 区间、或 1H 与 4H 方向统一后再看计划。</div>';
         return;
       }
@@ -765,13 +784,17 @@
       if(isLong && (h1.resistance - entry) / atr < 1.0){
         caution = '<div class="caution"><b>⚠ 贴近阻力，不要追多：</b>现价距 1 小时 50 周期阻力 '+fmtPx(h1.resistance)+' 只剩 '+fmt(h1.resistance-entry,1)+' USDT，不足 1×ATR（'+fmt(atr,1)+'）。在这里追多很容易被阻力压回扫掉止损。等回踩到 EMA9（'+fmtPx(h1.ema9)+'）/ VWAP（'+fmtPx(h1.vwap)+'）附近再考虑，或等 1 小时收盘确认站上阻力后再进。</div>';
       }
+      lastPlan = { entry:entry, sl:sl, tp1:tp1, tp2:tp2, qty:sizeBtc, unit:SYM().unit, isLong:isLong };
+      var ck = function(k){ return '<input type="checkbox" class="plan-ck" data-k="'+k+'" aria-label="勾选此项"'+(planSel[k]?' checked':'')+'>'; };
+      var off = function(k){ return planSel[k] ? '' : ' off'; };
       host.innerHTML =
         '<div class="plan-grid">' +
-          '<div class="plan-cell"><span>入场价（现价）</span><b>'+fmtPx(entry)+'</b><small>'+(isLong?"做多 LONG":"做空 SHORT")+' · 限价单可挂 EMA9 / VWAP 回踩位</small></div>' +
-          '<div class="plan-cell sl"><span>止损 SL（1.5×ATR · 下单即附）</span><b>'+fmtPx(sl)+'</b><small>下单即附止损 · 距入场 '+fmt(dist,1)+' USDT · 触发即离场，不移损扛单</small></div>' +
-          '<div class="plan-cell tp"><span>止盈一 TP1（1.5×ATR · 下单即附）</span><b>'+fmtPx(tp1)+'</b><small>下单即附止盈 · 盈亏比 1 : 1 · 到价先平一半并把止损移到入场价</small></div>' +
-          '<div class="plan-cell tp"><span>止盈二 TP2（2.5×ATR · 下单即附）</span><b>'+fmtPx(tp2)+'</b><small>下单即附止盈 · 盈亏比 1 : 1.67 · 剩余仓位目标</small></div>' +
+          '<div class="plan-cell'+off("entry")+'"><span>入场价（现价）</span><b>'+fmtPx(entry)+'</b><small>'+(isLong?"做多 LONG":"做空 SHORT")+' · 限价单可挂 EMA9 / VWAP 回踩位</small>'+ck("entry")+'</div>' +
+          '<div class="plan-cell sl'+off("sl")+'"><span>止损 SL（1.5×ATR · 下单即附）</span><b>'+fmtPx(sl)+'</b><small>下单即附止损 · 距入场 '+fmt(dist,1)+' USDT · 触发即离场，不移损扛单</small>'+ck("sl")+'</div>' +
+          '<div class="plan-cell tp'+off("tp1")+'"><span>止盈一 TP1（1.5×ATR · 下单即附）</span><b>'+fmtPx(tp1)+'</b><small>下单即附止盈 · 盈亏比 1 : 1 · 到价先平一半并把止损移到入场价</small>'+ck("tp1")+'</div>' +
+          '<div class="plan-cell tp'+off("tp2")+'"><span>止盈二 TP2（2.5×ATR · 下单即附）</span><b>'+fmtPx(tp2)+'</b><small>下单即附止盈 · 盈亏比 1 : 1.67 · 剩余仓位目标</small>'+ck("tp2")+'</div>' +
         '</div>' +
+        '<div class="bundle" id="bundleBar"></div>' +
         '<div class="size-row">' +
           '<span>单笔风险金额 <b>'+fmt(riskAmt,2)+' USDT</b></span>' +
           '<span>建议仓位 <b>'+fmt(sizeBtc,4)+' '+SYM().unit+'</b></span>' +
@@ -780,6 +803,7 @@
           '<span>逐仓 10x 保证金（用户设定） <b>'+fmt(margin,2)+' USDT</b></span>' +
           '<span>1H ATR <b>'+fmt(atr,1)+' USDT</b></span>' +
         '</div>' + caution;
+      renderBundle();
     }
 
     /* ================= fetch & cycle ================= */
@@ -860,6 +884,15 @@
       el("hvScore").textContent = "—";
       loadAll();
     }
+    el("planHost").addEventListener("change", function(ev){
+      var t = ev.target;
+      if(!t || !t.classList || !t.classList.contains("plan-ck")) return;
+      var k = t.getAttribute("data-k");
+      if(!k || !(k in planSel)) return;
+      planSel[k] = !!t.checked;
+      if(t.parentNode && t.parentNode.classList) t.parentNode.classList.toggle("off", !t.checked);
+      renderBundle();
+    });
     el("symBtc").addEventListener("click", function(){ setSym("BTC"); });
     el("symEth").addEventListener("click", function(){ setSym("ETH"); });
     applySym();
