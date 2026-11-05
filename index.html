@@ -192,6 +192,11 @@
       .pos-err{color:var(--red-text);font-size:13.5px;line-height:1.6}
       .pos-updated{color:var(--muted);font-size:12px;margin-top:10px}
       .pos-card{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:14px 16px 12px;margin-top:12px}
+      .pos-ord-head{margin:18px 0 2px;font-size:14px;font-weight:900}
+      .ord-card{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:10px 14px;margin-top:8px}
+      .ord-line{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+      .ord-meta{color:var(--muted);font-size:12.5px}
+      .ord-meta b{color:var(--text);font-family:var(--mono);font-weight:700}
       .pos-pnl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:10px}
       .pos-pnl-label{font-size:12px;color:var(--muted)}
       .pos-pnl b{font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:.01em;line-height:1.1}
@@ -1028,7 +1033,50 @@
       return pos;
     }
 
-    function renderPosData(bal, positions){
+    function fmtOrdTime(ts){
+      var d = new Date(parseInt(ts, 10));
+      return isNaN(d.getTime()) ? "" : d.toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+    function renderOrders(orders){
+      if(!orders) return '<div class="pos-ord-head">我的委托 · 未成交</div><p class="pos-note">委托读取失败（持仓不受影响）。</p>';
+      var items = [];
+      (orders.pending || []).forEach(function(o){
+        var isBuy = o.side === "buy";
+        var kind = o.ordType === "limit" ? "限价单" : o.ordType === "market" ? "市价单" : o.ordType === "post_only" ? "只做 Maker" : (o.ordType || "委托");
+        items.push({ inst: o.instId, isBuy: isBuy, kind: kind,
+          meta: '委托价 <b>' + fmt(parseFloat(o.px), 2) + '</b> · 数量 <b>' + posEsc(o.sz) + ' 张</b>' + ((parseFloat(o.accFillSz) || 0) > 0 ? ' · 已成交 <b>' + posEsc(o.accFillSz) + '</b>' : '') + ' · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
+          time: o.cTime });
+      });
+      (orders.cond || []).forEach(function(o){
+        var isBuy = o.side === "buy";
+        var trig = [];
+        if(o.tpTriggerPx) trig.push('止盈触发 <b>' + fmt(parseFloat(o.tpTriggerPx), 2) + '</b>');
+        if(o.slTriggerPx) trig.push('止损触发 <b>' + fmt(parseFloat(o.slTriggerPx), 2) + '</b>');
+        items.push({ inst: o.instId, isBuy: isBuy, kind: "条件单",
+          meta: trig.join(" · ") + ' · 数量 <b>' + posEsc(o.sz) + ' 张</b> · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
+          time: o.cTime });
+      });
+      (orders.oco || []).forEach(function(o){
+        var isBuy = o.side === "buy";
+        items.push({ inst: o.instId, isBuy: isBuy, kind: "止盈止损 · OCO",
+          meta: '止盈触发 <b>' + fmt(parseFloat(o.tpTriggerPx), 2) + '</b> · 止损触发 <b>' + fmt(parseFloat(o.slTriggerPx), 2) + '</b> · 数量 <b>' + posEsc(o.sz) + ' 张</b> · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
+          time: o.cTime });
+      });
+      var h = '<div class="pos-ord-head">我的委托 · 未成交 <b>' + items.length + '</b></div>';
+      if(!items.length) return h + '<p class="pos-note">当前无未成交委托。</p>';
+      for(var i=0;i<items.length;i++){
+        var it = items[i];
+        h += '<div class="ord-card"><div class="ord-line">' +
+          '<span class="pos-inst">' + posEsc(it.inst || "") + '</span>' +
+          '<span class="pos-side ' + (it.isBuy ? "long" : "short") + '">' + (it.isBuy ? "买入" : "卖出") + '</span>' +
+          '<span class="ord-meta"><b>' + posEsc(it.kind) + '</b></span>' +
+          '<span class="ord-meta">' + it.meta + '</span>' +
+          (it.time ? '<span class="ord-meta">' + fmtOrdTime(it.time) + '</span>' : '') +
+        '</div></div>';
+      }
+      return h;
+    }
+    function renderPosData(bal, positions, orders){
       var b = (bal && bal[0]) || {};
       var totalEq = parseFloat(b.totalEq);
       var live = [], uplSum = 0, i, p, eff;
@@ -1066,6 +1114,7 @@
           '<span>盈亏平衡 <b>' + fmt(parseFloat(q.bePx), 2) + '</b></span>' +
         '</div></div>';
       }
+      h += renderOrders(orders);
       h += '<div class="pos-actions"><button class="pos-btn" id="posRefresh" type="button">刷新持仓</button><button class="pos-btn" id="posWipe" type="button">清除本机凭证</button></div>' +
            '<p class="pos-updated">更新于 ' + new Date().toLocaleTimeString("zh-CN", { hour12: false }) + ' · 随页面 60 秒周期自动刷新 · 只读，不下单</p>';
       var usdtEq = null;
@@ -1107,12 +1156,17 @@
     function refreshPositions(){
       if(!posState.cred || posState.busy) return;
       posState.busy = true;
+      var ordP = function(path){ return okxPrivate(path).catch(function(){ return null; }); };
       Promise.all([
         okxPrivate("/api/v5/account/balance"),
-        okxPrivate("/api/v5/account/positions")
+        okxPrivate("/api/v5/account/positions"),
+        ordP("/api/v5/trade/orders-pending"),
+        ordP("/api/v5/trade/orders-algo-pending?ordType=conditional"),
+        ordP("/api/v5/trade/orders-algo-pending?ordType=oco")
       ]).then(function(res){
         posState.busy = false;
-        renderPosData(res[0], res[1]);
+        var orders = (res[2] === null && res[3] === null && res[4] === null) ? null : { pending: res[2] || [], cond: res[3] || [], oco: res[4] || [] };
+        renderPosData(res[0], res[1], orders);
       }).catch(function(err){
         posState.busy = false;
         renderPosError(err && err.message ? err.message : String(err));
