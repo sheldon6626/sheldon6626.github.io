@@ -158,6 +158,32 @@
       .plan-cell.tp b{color:var(--green-text)}
       .size-row{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--muted)}
       .size-row b{font-family:var(--mono);color:var(--text);font-size:15px}
+      /* ---------- my positions ---------- */
+      .pos{margin-top:26px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:18px 20px}
+      .pos h2{margin:0 0 2px;font-size:17px;font-weight:900}
+      .pos-sub{font-size:12px;color:var(--muted);font-weight:400;margin-left:8px}
+      .pos-note{color:var(--muted);font-size:13px;line-height:1.6}
+      .pos-form{max-width:420px}
+      .pos-form .field{margin-top:12px}
+      .pos-form input{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;padding:10px 12px;outline:none}
+      .pos-form input:focus{border-color:var(--amber)}
+      .pos-actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+      .pos-btn{appearance:none;border:1px solid var(--line2);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:14px;font-weight:700;border-radius:8px;padding:9px 16px;cursor:pointer}
+      .pos-btn.primary{background:var(--amber);border-color:var(--amber);color:#0a0c0f}
+      .pos-btn:active{transform:translateY(1px)}
+      .pos-btn:disabled{opacity:.5;cursor:wait}
+      .pos-sum{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13.5px;color:var(--muted);margin:6px 0 4px}
+      .pos-sum b{color:var(--text);font-family:var(--mono);font-weight:700}
+      .pos-item{border-top:1px solid var(--line);padding:12px 0 4px;margin-top:10px}
+      .pos-item-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+      .pos-inst{font-family:var(--mono);font-weight:700;font-size:15px}
+      .pos-side{font-size:12px;font-weight:700;border-radius:4px;padding:1px 7px}
+      .pos-side.long{color:var(--green-text);background:var(--green-dim)}
+      .pos-side.short{color:var(--red-text);background:var(--red-dim)}
+      .pos-grid{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;color:var(--muted);margin-top:7px}
+      .pos-grid b{color:var(--text);font-family:var(--mono);font-weight:600}
+      .pos-err{color:var(--red-text);font-size:13.5px;line-height:1.6}
+      .pos-updated{color:var(--muted);font-size:12px;margin-top:10px}
       .caution{margin-top:14px;border:1px solid rgba(240,185,11,.45);background:var(--amber-dim);border-radius:8px;padding:11px 14px;font-size:13.5px;color:#ffe08a}
       .caution b{color:#ffd75e}
       .flat-note{border:1px dashed var(--line2);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13.5px}
@@ -295,6 +321,12 @@
           <div id="planHost"></div>
         </section>
 
+        <!-- my positions (OKX read-only; credentials stay in this browser) -->
+        <section class="pos">
+          <h2>我的持仓<span class="pos-sub">OKX 实盘 · 只读 · 凭证只存本机浏览器</span></h2>
+          <div id="posHost"><p class="pos-note">读取中…</p></div>
+        </section>
+
         <!-- method + disclaimer -->
         <details class="method">
           <summary>算法与规则说明<span class="fold-hint">点击展开</span></summary>
@@ -307,7 +339,7 @@
           </ul>
         </details>
         <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓 10x（用户设定）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
-        <p class="foot">数据源：OKX 公开行情接口 · 本页不下单、不托管资金、不保存你的任何输入</p>
+        <p class="foot">数据源：OKX 接口 · 本页不下单、不托管资金；持仓凭证按你的选择只保存在本机浏览器</p>
       </main>
     </div>
 
@@ -335,8 +367,9 @@
     /* Data routes: direct OKX first; if the visitor's network cannot reach
        okx.com (common on mainland-CN connections), fall back to public CORS
        relays that fetch the same public market data. The first route that
-       answers becomes sticky for the rest of the session. Market data only —
-       no keys, no account data ever passes through any route. */
+       answers becomes sticky for the rest of the session. These routes
+       carry public market data only; account (positions) reads use the
+       separate signed-request path in okxPrivate below. */
     var ROUTES = [
       function(u){ return u; },
       function(u){ return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); },
@@ -735,6 +768,7 @@
       if(state.busy) return;
       state.busy = true;
       el("refreshBtn").disabled = true;
+      refreshPositions();
       var inst = SYM().inst;
       var p = Promise.all([
         fetchJSON(API + "/api/v5/market/ticker?instId=" + inst),
@@ -817,9 +851,200 @@
       el("statusText").textContent = "实盘已连接 · 更新于 " + state.lastUpdate.toLocaleTimeString("zh-CN",{hour12:false}) + " · " + state.countdown + "s 后自动刷新";
     }, 1000);
 
+    /* ================= my positions (OKX read-only) ================= */
+    /* The three credential values live ONLY in this browser's localStorage
+       (the visitor pastes them once, on their own device). They are never
+       written into this page's code and never sent anywhere except inside
+       the signed OKX request headers below. Signing happens locally with
+       WebCrypto. Requests try a direct connection first; if the network
+       cannot reach OKX, they fall back to a header-forwarding CORS relay —
+       the relay can see the passphrase header but never the secret, and the
+       key is read-only, so it can look but never trade or withdraw. */
+    var CRED_KEY = "qt_okx_cred_v1";
+    var CTVAL = { "BTC-USDT-SWAP": 0.01, "ETH-USDT-SWAP": 0.1 };
+    var posState = { cred: null, busy: false };
+    var okxTimeOffset = null;
+
+    function loadCred(){
+      try {
+        var raw = window.localStorage.getItem(CRED_KEY);
+        if(!raw) return null;
+        var c = JSON.parse(raw);
+        if(c && c.k && c.s && c.p) return c;
+      } catch(e) {}
+      return null;
+    }
+    function storeCred(c){
+      try { window.localStorage.setItem(CRED_KEY, JSON.stringify(c)); } catch(e) {}
+    }
+    function wipeCred(){
+      try { window.localStorage.removeItem(CRED_KEY); } catch(e) {}
+    }
+    function syncOkxTime(){
+      if(okxTimeOffset !== null) return Promise.resolve(okxTimeOffset);
+      return fetchJSON(API + "/api/v5/public/time").then(function(d){
+        okxTimeOffset = (+d[0].ts) - Date.now();
+        return okxTimeOffset;
+      }).catch(function(){ okxTimeOffset = 0; return 0; });
+    }
+    function hmacB64(secret, msg){
+      var enc = new TextEncoder();
+      return crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+        .then(function(key){ return crypto.subtle.sign("HMAC", key, enc.encode(msg)); })
+        .then(function(sig){
+          var bytes = new Uint8Array(sig), s = "";
+          for(var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+          return btoa(s);
+        });
+    }
+    function fetchSigned(url, headers, ms){
+      var ctl = ("AbortController" in window) ? new AbortController() : null;
+      var to = ctl ? setTimeout(function(){ ctl.abort(); }, ms) : null;
+      return fetch(url, { method: "GET", headers: headers, signal: ctl ? ctl.signal : undefined }).then(function(r){
+        if(to) clearTimeout(to);
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+    }
+    function okxPrivate(path){
+      var cred = posState.cred;
+      if(!cred) return Promise.reject(new Error("尚未保存凭证"));
+      if(!window.crypto || !crypto.subtle) return Promise.reject(new Error("当前不是 HTTPS 安全环境，无法在本地签名"));
+      return syncOkxTime().then(function(){
+        var ts = new Date(Date.now() + (okxTimeOffset || 0)).toISOString();
+        return hmacB64(cred.s, ts + "GET" + path).then(function(sign){
+          var headers = {
+            "OK-ACCESS-KEY": cred.k,
+            "OK-ACCESS-SIGN": sign,
+            "OK-ACCESS-TIMESTAMP": ts,
+            "OK-ACCESS-PASSPHRASE": cred.p
+          };
+          var url = API + path;
+          var routes = [ url, "https://corsproxy.io/?url=" + encodeURIComponent(url) ];
+          function attempt(i){
+            if(i >= routes.length) return Promise.reject(new Error("两条通道都连不上 OKX 私有接口"));
+            return fetchSigned(routes[i], headers, 12000).then(function(j){
+              if(!j || j.code !== "0") throw new Error("OKX 返回错误 " + (j && j.code) + "：" + ((j && j.msg) || "未知错误"));
+              return j.data;
+            }).catch(function(e){
+              if(e && /^OKX 返回错误/.test(e.message)) throw e; /* auth/API errors: another relay won't help */
+              return attempt(i + 1);
+            });
+          }
+          return attempt(0);
+        });
+      });
+    }
+    function posEsc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+    function renderPosSetup(msg){
+      var h = "";
+      if(msg) h += '<p class="pos-err">' + posEsc(msg) + '</p>';
+      h += '<p class="pos-note">把你的 OKX <b>只读</b> API 凭证粘贴一次即可：只保存在这台设备的浏览器里，不写进页面代码、不上传到任何服务器。页面在本机算签名读取持仓，只看不下单。</p>' +
+        '<div class="pos-form">' +
+          '<div class="field"><label for="okxKey">API Key</label><input id="okxKey" type="text" autocomplete="off" spellcheck="false" /></div>' +
+          '<div class="field"><label for="okxSecret">Secret Key</label><input id="okxSecret" type="password" autocomplete="off" spellcheck="false" /></div>' +
+          '<div class="field"><label for="okxPass">Passphrase</label><input id="okxPass" type="password" autocomplete="off" spellcheck="false" /></div>' +
+          '<div class="pos-actions"><button class="pos-btn primary" id="okxSave" type="button">保存并读取持仓</button></div>' +
+          '<p class="pos-note">提醒：直连不上 OKX 时会走中转通道，中转方能看到请求头里的 Passphrase（看不到 Secret，也签不了名）；只读 Key 能看不能动。若 OKX 提示 IP 白名单错误，请确认这把 Key 没有绑定 IP。</p>' +
+        '</div>';
+      el("posHost").innerHTML = h;
+      el("okxSave").addEventListener("click", function(){
+        var k = el("okxKey").value.trim(), s = el("okxSecret").value.trim(), p = el("okxPass").value.trim();
+        if(!k || !s || !p){ renderPosSetup("三个值都要填，缺一个都读不了。"); return; }
+        posState.cred = { k: k, s: s, p: p };
+        storeCred(posState.cred);
+        okxTimeOffset = null;
+        el("posHost").innerHTML = '<p class="pos-note">读取中…</p>';
+        refreshPositions();
+      });
+    }
+
+    function posSideOf(p){
+      var pos = parseFloat(p.pos) || 0;
+      if(p.posSide === "long") return Math.abs(pos);
+      if(p.posSide === "short") return -Math.abs(pos);
+      return pos;
+    }
+
+    function renderPosData(bal, positions){
+      var b = (bal && bal[0]) || {};
+      var totalEq = parseFloat(b.totalEq);
+      var live = [], uplSum = 0, i, p, eff;
+      for(i=0;i<(positions||[]).length;i++){
+        p = positions[i]; eff = posSideOf(p);
+        if(!eff) continue;
+        live.push({ p: p, eff: eff });
+        uplSum += parseFloat(p.upl || 0) || 0;
+      }
+      var h = '<div class="pos-sum">' +
+        '<span>总权益 <b>' + (isFinite(totalEq) ? fmt(totalEq, 2) : "—") + ' USD</b></span>' +
+        '<span>持仓未实现盈亏 <b class="' + (uplSum > 0 ? "up" : uplSum < 0 ? "down" : "") + '">' + (uplSum > 0 ? "+" : "") + fmt(uplSum, 2) + ' USDT</b></span>' +
+        '<span>持仓数 <b>' + live.length + '</b></span>' +
+      '</div>';
+      if(!live.length) h += '<p class="pos-note">当前没有持仓。</p>';
+      for(var j=0;j<live.length;j++){
+        var q = live[j].p, eff2 = live[j].eff, isLong = eff2 > 0;
+        var inst = q.instId || "";
+        var base = CTVAL[inst] ? Math.abs(eff2) * CTVAL[inst] : null;
+        var baseUnit = inst.split("-")[0] || "";
+        var upl = parseFloat(q.upl || 0) || 0;
+        var uplRatio = parseFloat(q.uplRatio);
+        h += '<div class="pos-item"><div class="pos-item-head">' +
+          '<span class="pos-inst">' + posEsc(inst) + '</span>' +
+          '<span class="pos-side ' + (isLong ? "long" : "short") + '">' + (isLong ? "做多" : "做空") + '</span>' +
+          '<span class="pos-note">' + Math.abs(eff2) + ' 张' + (base !== null ? '（≈ ' + fmt(base, 4) + ' ' + posEsc(baseUnit) + '）' : '') + ' · ' + posEsc(q.lever || "—") + 'x · ' + (q.mgnMode === "cross" ? "全仓" : q.mgnMode === "isolated" ? "逐仓" : posEsc(q.mgnMode || "")) + '</span>' +
+        '</div><div class="pos-grid">' +
+          '<span>开仓均价 <b>' + fmt(parseFloat(q.avgPx), 2) + '</b></span>' +
+          '<span>标记价格 <b>' + fmt(parseFloat(q.markPx), 2) + '</b></span>' +
+          '<span>名义价值 <b>' + fmt(parseFloat(q.notionalUsd), 2) + ' USD</b></span>' +
+          '<span>未实现盈亏 <b class="' + (upl > 0 ? "up" : upl < 0 ? "down" : "") + '">' + (upl > 0 ? "+" : "") + fmt(upl, 2) + ' USDT' + (isFinite(uplRatio) ? '（' + (uplRatio > 0 ? "+" : "") + fmt(uplRatio * 100, 1) + '%）' : '') + '</b></span>' +
+          (q.liqPx ? '<span>爆仓价 <b>' + fmt(parseFloat(q.liqPx), 2) + '</b></span>' : '') +
+          '<span>盈亏平衡 <b>' + fmt(parseFloat(q.bePx), 2) + '</b></span>' +
+        '</div></div>';
+      }
+      h += '<div class="pos-actions"><button class="pos-btn" id="posRefresh" type="button">刷新持仓</button><button class="pos-btn" id="posWipe" type="button">清除本机凭证</button></div>' +
+           '<p class="pos-updated">更新于 ' + new Date().toLocaleTimeString("zh-CN", { hour12: false }) + ' · 随页面 60 秒周期自动刷新 · 只读，不下单</p>';
+      el("posHost").innerHTML = h;
+      el("posRefresh").addEventListener("click", function(){ refreshPositions(); });
+      el("posWipe").addEventListener("click", function(){
+        wipeCred(); posState.cred = null; renderPosSetup("本机凭证已清除。");
+      });
+    }
+
+    function renderPosError(msg){
+      el("posHost").innerHTML = '<p class="pos-err">持仓读取失败：' + posEsc(msg) + '</p>' +
+        '<div class="pos-actions"><button class="pos-btn" id="posRetry" type="button">重试</button><button class="pos-btn" id="posWipe2" type="button">清除本机凭证重填</button></div>';
+      el("posRetry").addEventListener("click", function(){ refreshPositions(); });
+      el("posWipe2").addEventListener("click", function(){
+        wipeCred(); posState.cred = null; renderPosSetup();
+      });
+    }
+
+    function refreshPositions(){
+      if(!posState.cred || posState.busy) return;
+      posState.busy = true;
+      Promise.all([
+        okxPrivate("/api/v5/account/balance"),
+        okxPrivate("/api/v5/account/positions")
+      ]).then(function(res){
+        posState.busy = false;
+        renderPosData(res[0], res[1]);
+      }).catch(function(err){
+        posState.busy = false;
+        renderPosError(err && err.message ? err.message : String(err));
+      });
+    }
+
+    function initPositions(){
+      posState.cred = loadCred();
+      if(!posState.cred) renderPosSetup();
+    }
+
     /* Access control lives at the domain edge now (Cloudflare Access,
        email one-time PIN) — the page no longer carries its own PIN gate,
        so it simply starts loading on open. */
+    initPositions();
     loadAll();
     </script>
   </body>
