@@ -161,6 +161,17 @@
       .method h2{margin:0 0 8px;font-size:15px;font-weight:900}
       .method p,.method li{color:var(--muted);font-size:12.8px}
       .method ul{margin:6px 0;padding-left:18px}
+
+      /* ---------- collapsible notes (folded by default) ---------- */
+      .fold-hint{font-size:11.5px;font-weight:400;color:var(--faint);margin-left:6px}
+      .fold-note{margin:0 0 12px}
+      .fold-note summary{cursor:pointer;color:var(--faint);font-size:12.5px;user-select:none;-webkit-tap-highlight-color:transparent}
+      .fold-note summary:hover{color:var(--muted)}
+      .fold-note p{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+      .risk .fold-note{margin:2px 0 14px}
+      .risk .fold-note p{margin:6px 0 0}
+      .method summary{cursor:pointer;font-size:15px;font-weight:900;user-select:none;-webkit-tap-highlight-color:transparent}
+      .method summary:hover{color:var(--muted)}
       .disclaimer{margin-top:16px;border:1px solid rgba(246,70,93,.35);background:var(--red-dim);border-radius:8px;padding:13px 16px;font-size:13px;color:#f3b7bf}
       .disclaimer b{color:var(--red-text)}
       .foot{margin-top:14px;color:var(--faint);font-size:11.5px;text-align:center}
@@ -268,13 +279,19 @@
 
         <!-- timeframe cards -->
         <h2 class="sec-title">三周期算法投票明细</h2>
-        <p class="sec-sub">每个周期由 9 个主流算法独立投票（-1 强空 ～ +1 强多），按权重汇总后再乘 ADX 行情状态系数：ADX &lt; 20 打六折、20–25 打 85 折、≥ 25 全额计入，避免在横盘里被假信号反复打脸。</p>
+        <details class="fold-note">
+          <summary>说明：投票与 ADX 行情状态系数<span class="fold-hint">点击展开</span></summary>
+          <p>每个周期由 9 个主流算法独立投票（-1 强空 ～ +1 强多），按权重汇总后再乘 ADX 行情状态系数：ADX &lt; 20 打六折、20–25 打 85 折、≥ 25 全额计入，避免在横盘里被假信号反复打脸。</p>
+        </details>
         <div class="tfgrid" id="tfGrid"></div>
 
         <!-- risk plan -->
         <section class="risk">
           <h2>风控计划</h2>
-          <p class="sub">止损 / 止盈按 1 小时 ATR(14) 计算，下单即附止损和止盈：止损 = 入场价 ∓ 1.5×ATR，止盈一 = ±1.5×ATR（盈亏比 1:1 先保本），止盈二 = ±2.5×ATR（盈亏比 1:1.67）。仓位按「单笔最多亏 账户权益 × 风险%」反推，并受逐仓 10x（用户设定）上限约束：名义价值不超过账户权益 × 10。</p>
+          <details class="fold-note">
+            <summary>说明：止损 / 止盈与仓位计算<span class="fold-hint">点击展开</span></summary>
+            <p>止损 / 止盈按 1 小时 ATR(14) 计算，下单即附止损和止盈：止损 = 入场价 ∓ 1.5×ATR，止盈一 = ±1.5×ATR（盈亏比 1:1 先保本），止盈二 = ±2.5×ATR（盈亏比 1:1.67）。仓位按「单笔最多亏 账户权益 × 风险%」反推，并受逐仓 10x（用户设定）上限约束：名义价值不超过账户权益 × 10。</p>
+          </details>
           <div class="risk-inputs">
             <div class="field">
               <label for="equityInput">账户权益</label>
@@ -293,8 +310,8 @@
         </section>
 
         <!-- method + disclaimer -->
-        <section class="method">
-          <h2>算法与规则说明</h2>
+        <details class="method">
+          <summary>算法与规则说明<span class="fold-hint">点击展开</span></summary>
           <ul>
             <li><b>九个算法（权重）：</b>EMA 趋势排列 9/21/50（15）、MA 均线交叉 5/20（10）、MACD 12/26/9（15）、RSI 14（10）、布林带 20/2 按 %B 投票（10）、随机指标 Stochastic 14/3（10）、Supertrend 10/3（15）、ROC 动量 10 周期（10）、VWAP 偏离（5）。只使用已收盘确认的 K 线计算，避免盘中信号闪烁。EMA 以首根收盘价为种子递推，RSI / ATR / ADX 按 Wilder 口径计算，与 Python 参考引擎 quant_tool.py 逐项一致。</li>
             <li><b>布林带双模式：</b>ADX ≥ 25 按趋势模式：%B &gt; 0.8 投 +0.8、%B &lt; 0.2 投 −0.8、中间投 %B − 0.5；ADX &lt; 25 按震荡均值回归：%B &gt; 0.95 投 −0.8、%B &lt; 0.05 投 +0.8、中间投 0。</li>
@@ -302,7 +319,7 @@
             <li><b>行情状态过滤：</b>每个周期先算 ADX(14)：≥25 趋势市信号全额计入，20–25 过渡打 85 折，&lt;20 震荡市打 6 折。</li>
             <li><b>数据：</b>OKX 公开接口（BTC-USDT-SWAP 永续），页面打开即拉取，每 60 秒自动刷新；页面上方显示最后更新时间。信号只在你打开本页时计算，不构成任何时刻的实时喊单。</li>
           </ul>
-        </section>
+        </details>
         <div class="disclaimer"><b>风险提示：</b>本页输出的是公开算法对实盘行情的机械计算结果，<b>不是投资建议</b>，不保证盈利。永续合约带杠杆，波动剧烈时可能快速亏损甚至爆仓。本页风控计划按你设定的参数计算：<b>逐仓 10x（用户设定）、单笔风险默认 5%、下单即附止损和止盈</b>；10 倍杠杆下价格反向约 10% 就接近强平，风险明显高于低杠杆，请先用模拟盘验证。截图里那种 30 倍全仓不要模仿——价格反向约 3% 就接近强平。先用模拟盘验证策略，再考虑小资金实盘。</div>
         <p class="foot">数据源：OKX 公开行情接口 · 本页不下单、不托管资金、不保存你的任何输入</p>
       </main>
