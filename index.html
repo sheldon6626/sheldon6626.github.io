@@ -179,8 +179,11 @@
       .pos-btn.primary{background:var(--amber);border-color:var(--amber);color:#0a0c0f}
       .pos-btn:active{transform:translateY(1px)}
       .pos-btn:disabled{opacity:.5;cursor:wait}
-      .pos-sum{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13.5px;color:var(--muted);margin:6px 0 4px}
-      .pos-sum b{color:var(--text);font-family:var(--mono);font-weight:700}
+      .pos-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}
+      .pos-sum-cell{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:9px 12px}
+      .pos-sum-cell span{display:block;font-size:11.5px;color:var(--muted)}
+      .pos-sum-cell b{display:block;color:var(--text);font-family:var(--mono);font-weight:700;font-size:17px;margin-top:2px}
+      @media (max-width:560px){.pos-sum{grid-template-columns:1fr 1fr}}
       .pos-item{border-top:1px solid var(--line);padding:12px 0 4px;margin-top:10px}
       .pos-item-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
       .pos-inst{font-family:var(--mono);font-weight:700;font-size:15px}
@@ -193,10 +196,11 @@
       .pos-updated{color:var(--muted);font-size:12px;margin-top:10px}
       .pos-card{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:14px 16px 12px;margin-top:12px}
       .pos-ord-head{margin:18px 0 2px;font-size:14px;font-weight:900}
-      .ord-card{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:10px 14px;margin-top:8px}
-      .ord-line{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
-      .ord-meta{color:var(--muted);font-size:12.5px}
-      .ord-meta b{color:var(--text);font-family:var(--mono);font-weight:700}
+      .ord-card{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:14px 16px 12px;margin-top:12px}
+      .ord-kind{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px;background:var(--panel);border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+      .ord-figs{display:flex;gap:30px;flex-wrap:wrap;margin:9px 0 3px}
+      .ord-fig span{display:block;font-size:11.5px;color:var(--muted)}
+      .ord-fig b{font-family:var(--mono);font-size:24px;font-weight:800;line-height:1.15}
       .pos-pnl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:10px}
       .pos-pnl-label{font-size:12px;color:var(--muted)}
       .pos-pnl b{font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:.01em;line-height:1.1}
@@ -1039,41 +1043,47 @@
     }
     function renderOrders(orders){
       if(!orders) return '<div class="pos-ord-head">我的委托 · 未成交</div><p class="pos-note">委托读取失败（持仓不受影响）。</p>';
+      function modeTxt(m){ return m === "cross" ? "全仓" : m === "isolated" ? "逐仓" : (m || ""); }
+      function qtyTxt(o){
+        var ct = CTVAL[o.instId];
+        var base = ct ? Math.abs(parseFloat(o.sz) || 0) * ct : null;
+        return posEsc(o.sz) + ' 张' + (base !== null ? '（≈ ' + fmt(base, 4) + ' ' + posEsc((o.instId || "").split("-")[0]) + '）' : '');
+      }
       var items = [];
       (orders.pending || []).forEach(function(o){
-        var isBuy = o.side === "buy";
-        var kind = o.ordType === "limit" ? "限价单" : o.ordType === "market" ? "市价单" : o.ordType === "post_only" ? "只做 Maker" : (o.ordType || "委托");
-        items.push({ inst: o.instId, isBuy: isBuy, kind: kind,
-          meta: '委托价 <b>' + fmt(parseFloat(o.px), 2) + '</b> · 数量 <b>' + posEsc(o.sz) + ' 张</b>' + ((parseFloat(o.accFillSz) || 0) > 0 ? ' · 已成交 <b>' + posEsc(o.accFillSz) + '</b>' : '') + ' · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
-          time: o.cTime });
+        items.push({ inst: o.instId, isBuy: o.side === "buy",
+          kind: o.ordType === "limit" ? "限价单" : o.ordType === "market" ? "市价单" : o.ordType === "post_only" ? "只做 Maker" : (o.ordType || "委托"),
+          figs: [{ label: "委托价", val: fmt(parseFloat(o.px), 2), cls: "" }],
+          grid: [["数量", qtyTxt(o)], ["已成交", posEsc(o.accFillSz || "0") + " 张"], ["杠杆 · 模式", posEsc(o.lever || "—") + "x · " + modeTxt(o.tdMode)], ["下单时间", fmtOrdTime(o.cTime)]] });
       });
       (orders.cond || []).forEach(function(o){
-        var isBuy = o.side === "buy";
-        var trig = [];
-        if(o.tpTriggerPx) trig.push('止盈触发 <b>' + fmt(parseFloat(o.tpTriggerPx), 2) + '</b>');
-        if(o.slTriggerPx) trig.push('止损触发 <b>' + fmt(parseFloat(o.slTriggerPx), 2) + '</b>');
-        items.push({ inst: o.instId, isBuy: isBuy, kind: "条件单",
-          meta: trig.join(" · ") + ' · 数量 <b>' + posEsc(o.sz) + ' 张</b> · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
-          time: o.cTime });
+        var figs = [];
+        if(o.tpTriggerPx) figs.push({ label: "止盈触发", val: fmt(parseFloat(o.tpTriggerPx), 2), cls: "up" });
+        if(o.slTriggerPx) figs.push({ label: "止损触发", val: fmt(parseFloat(o.slTriggerPx), 2), cls: "down" });
+        items.push({ inst: o.instId, isBuy: o.side === "buy", kind: "条件单", figs: figs,
+          grid: [["数量", qtyTxt(o)], ["杠杆 · 模式", posEsc(o.lever || "—") + "x · " + modeTxt(o.tdMode)], ["下单时间", fmtOrdTime(o.cTime)]] });
       });
       (orders.oco || []).forEach(function(o){
-        var isBuy = o.side === "buy";
-        items.push({ inst: o.instId, isBuy: isBuy, kind: "止盈止损 · OCO",
-          meta: '止盈触发 <b>' + fmt(parseFloat(o.tpTriggerPx), 2) + '</b> · 止损触发 <b>' + fmt(parseFloat(o.slTriggerPx), 2) + '</b> · 数量 <b>' + posEsc(o.sz) + ' 张</b> · ' + posEsc(o.lever || "—") + 'x · ' + (o.tdMode === "cross" ? "全仓" : o.tdMode === "isolated" ? "逐仓" : posEsc(o.tdMode || "")),
-          time: o.cTime });
+        items.push({ inst: o.instId, isBuy: o.side === "buy", kind: "止盈止损 · OCO",
+          figs: [{ label: "止盈触发", val: fmt(parseFloat(o.tpTriggerPx), 2), cls: "up" }, { label: "止损触发", val: fmt(parseFloat(o.slTriggerPx), 2), cls: "down" }],
+          grid: [["数量", qtyTxt(o)], ["杠杆 · 模式", posEsc(o.lever || "—") + "x · " + modeTxt(o.tdMode)], ["下单时间", fmtOrdTime(o.cTime)]] });
       });
       var h = '<div class="pos-ord-head">我的委托 · 未成交 <b>' + items.length + '</b></div>';
       if(!items.length) return h + '<p class="pos-note">当前无未成交委托。</p>';
-      for(var i=0;i<items.length;i++){
-        var it = items[i];
-        h += '<div class="ord-card"><div class="ord-line">' +
+      items.forEach(function(it){
+        h += '<div class="ord-card"><div class="pos-item-head">' +
           '<span class="pos-inst">' + posEsc(it.inst || "") + '</span>' +
           '<span class="pos-side ' + (it.isBuy ? "long" : "short") + '">' + (it.isBuy ? "买入" : "卖出") + '</span>' +
-          '<span class="ord-meta"><b>' + posEsc(it.kind) + '</b></span>' +
-          '<span class="ord-meta">' + it.meta + '</span>' +
-          (it.time ? '<span class="ord-meta">' + fmtOrdTime(it.time) + '</span>' : '') +
-        '</div></div>';
-      }
+          '<span class="ord-kind">' + posEsc(it.kind) + '</span></div>';
+        if(it.figs.length){
+          h += '<div class="ord-figs">';
+          it.figs.forEach(function(f){ h += '<div class="ord-fig"><span>' + f.label + '</span><b class="' + f.cls + '">' + f.val + '</b></div>'; });
+          h += '</div>';
+        }
+        h += '<div class="pos-grid">';
+        it.grid.forEach(function(g){ h += '<span>' + g[0] + ' <b>' + g[1] + '</b></span>'; });
+        h += '</div></div>';
+      });
       return h;
     }
     function renderPosData(bal, positions, orders){
@@ -1087,9 +1097,9 @@
         uplSum += parseFloat(p.upl || 0) || 0;
       }
       var h = '<div class="pos-sum">' +
-        '<span>总权益 <b>' + (isFinite(totalEq) ? fmt(totalEq, 2) : "—") + ' USD</b></span>' +
-        '<span>持仓未实现盈亏 <b class="pos-sum-upl ' + (uplSum > 0 ? "up" : uplSum < 0 ? "down" : "") + '">' + (uplSum > 0 ? "+" : "") + fmt(uplSum, 2) + ' USDT</b></span>' +
-        '<span>持仓数 <b>' + live.length + '</b></span>' +
+        '<div class="pos-sum-cell"><span>总权益</span><b>' + (isFinite(totalEq) ? fmt(totalEq, 2) : "—") + ' USD</b></div>' +
+        '<div class="pos-sum-cell"><span>持仓未实现盈亏</span><b class="pos-sum-upl ' + (uplSum > 0 ? "up" : uplSum < 0 ? "down" : "") + '">' + (uplSum > 0 ? "+" : "") + fmt(uplSum, 2) + ' USDT</b></div>' +
+        '<div class="pos-sum-cell"><span>持仓数</span><b>' + live.length + '</b></div>' +
       '</div>';
       if(!live.length) h += '<p class="pos-note">当前没有持仓。</p>';
       for(var j=0;j<live.length;j++){
