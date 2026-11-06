@@ -304,29 +304,6 @@
           <div class="conflict-note hidden" id="conflictNote">⚠ <b>周期冲突：</b>1 小时与 4 小时方向相反且强度都超过 25 分，大周期和小周期在打架。按规则强制降级为「观望」——等其中一个周期转向、或价格确认突破关键位后再行动，不要在两个方向之间猜。</div>
         </section>
 
-        <!-- chart -->
-        <section class="chartcard">
-          <div class="chart-head">
-            <h2>1 小时 K 线（最近 72 根 · 已收盘）与均线</h2>
-            <div class="legend">
-              <span class="lg"><i style="background:#e8eaed"></i>收盘价</span>
-              <span class="lg"><i style="background:#f0b90b"></i>EMA 21</span>
-              <span class="lg"><i style="background:#7cc4ff"></i>EMA 50</span>
-              <span class="lg"><i style="background:#0ecb81"></i>支撑（50 周期低点）</span>
-              <span class="lg"><i style="background:#f6465d"></i>阻力（50 周期高点）</span>
-            </div>
-          </div>
-          <div id="chartHost"></div>
-        </section>
-
-        <!-- timeframe cards -->
-        <h2 class="sec-title">三周期算法投票明细</h2>
-        <details class="fold-note">
-          <summary>说明：投票与 ADX 行情状态系数<span class="fold-hint">点击展开</span></summary>
-          <p>每个周期由 9 个主流算法独立投票（-1 强空 ～ +1 强多），按权重汇总后再乘 ADX 行情状态系数：ADX &lt; 20 打六折、20–25 打 85 折、≥ 25 全额计入，避免在横盘里被假信号反复打脸。</p>
-        </details>
-        <div class="tfgrid" id="tfGrid"></div>
-
         <!-- risk plan -->
         <section class="risk">
           <h2>风控计划</h2>
@@ -350,6 +327,29 @@
           </div>
           <div id="planHost"></div>
         </section>
+
+        <!-- chart -->
+        <section class="chartcard">
+          <div class="chart-head">
+            <h2>1 小时 K 线（最近 72 根 · 已收盘）与均线</h2>
+            <div class="legend">
+              <span class="lg"><i style="background:#e8eaed"></i>收盘价</span>
+              <span class="lg"><i style="background:#f0b90b"></i>EMA 21</span>
+              <span class="lg"><i style="background:#7cc4ff"></i>EMA 50</span>
+              <span class="lg"><i style="background:#0ecb81"></i>支撑（50 周期低点）</span>
+              <span class="lg"><i style="background:#f6465d"></i>阻力（50 周期高点）</span>
+            </div>
+          </div>
+          <div id="chartHost"></div>
+        </section>
+
+        <!-- timeframe cards -->
+        <h2 class="sec-title">三周期算法投票明细</h2>
+        <details class="fold-note">
+          <summary>说明：投票与 ADX 行情状态系数<span class="fold-hint">点击展开</span></summary>
+          <p>每个周期由 9 个主流算法独立投票（-1 强空 ～ +1 强多），按权重汇总后再乘 ADX 行情状态系数：ADX &lt; 20 打六折、20–25 打 85 折、≥ 25 全额计入，避免在横盘里被假信号反复打脸。</p>
+        </details>
+        <div class="tfgrid" id="tfGrid"></div>
 
         <!-- my positions (OKX read-only; credentials stay in this browser) -->
         <section class="possec">
